@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Arc Dark tokens — stockX Pro trading app */
+:root {
+  --bg: #0a0f1a;
+  --bg-gradient: linear-gradient(180deg, #0a0f1a 0%, #0d1420 58%, #111927 100%);
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-strong: rgba(255, 255, 255, 0.10);
+  --surface-muted: #131c2e;
+  --ink: #f9faf3;
+  --ink-2: #e3ecf9;
+  --muted: #cbd5e1;
+  --subtle: #94a3b8;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(251, 79, 31, 0.35);
+  /* Orange accent palette */
+  --accent: #fb4f1f;
+  --accent-hover: #ff6a3d;
+  --orange: #fb4f1f;
+  --oranged: #ff7518;
+  --sunset: #ffa04d;
+  --flame: #ff6a3d;
+  --tangerine: #ffb347;
+  /* Semantic */
+  --success: #8dd89f;
+  --danger: #e86d7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100dvh;
+}
+
+.display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
+.mono { font-family: 'JetBrains Mono', Menlo, monospace; }
+
+/* TradingView widget */
+.tv-widget-container {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f1922;
+}
+.tv-widget-container iframe {
+  width: 100% !important;
+  border: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* Tabular numbers for prices */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Glass card */
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.glass-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
