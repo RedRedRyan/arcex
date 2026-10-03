@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @notice Use this when you want to seed pools without re-deploying.
 ///
 /// Required env vars:
-///   PRIVATE_KEY            — owner private key
+///   ARC_PRIVATE_KEY        — owner private key
 ///   SPOT_POOL_ADDRESS      — deployed SpotPoolFactory address
 ///   TECHX_ADDRESS          — deployed TECHx MockERC20
 ///   ENERGYX_ADDRESS        — deployed ENERGYx MockERC20
@@ -18,9 +18,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   USDC_ADDRESS           — USDC ERC-20 on Arc Testnet
 ///
 /// Optional (with defaults):
-///   SEED_USDC_TECHX        — USDC to seed TECHx pool  (default 15_000e6)
-///   SEED_USDC_ENERGYX      — USDC to seed ENERGYx pool (default  7_500e6)
-///   SEED_USDC_ARCX         — USDC to seed ARCx pool    (default  2_500e6)
+///   SEED_USDC_TECHX        — USDC to seed TECHx pool  (default 150e6)
+///   SEED_USDC_ENERGYX      — USDC to seed ENERGYx pool (default 75e6)
+///   SEED_USDC_ARCX         — USDC to seed ARCx pool    (default 25e6)
 ///
 /// Run:
 ///   forge script contracts/script/SeedPools.s.sol \
@@ -31,7 +31,7 @@ contract SeedPools is Script {
     uint256 constant ARCX_PRICE    =  25_00000000;
 
     function run() external {
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
 
         SpotPoolFactory spotPool = SpotPoolFactory(vm.envAddress("SPOT_POOL_ADDRESS"));
@@ -40,9 +40,9 @@ contract SeedPools is Script {
         MockERC20 arcx           = MockERC20(vm.envAddress("ARCX_ADDRESS"));
         address usdc             = vm.envAddress("USDC_ADDRESS");
 
-        uint256 usdcTechx   = vm.envOr("SEED_USDC_TECHX",   uint256(15_000_000_000));
-        uint256 usdcEnergyx = vm.envOr("SEED_USDC_ENERGYX", uint256(7_500_000_000));
-        uint256 usdcArcx    = vm.envOr("SEED_USDC_ARCX",    uint256(2_500_000_000));
+        uint256 usdcTechx   = vm.envOr("SEED_USDC_TECHX",   uint256(150_000_000));
+        uint256 usdcEnergyx = vm.envOr("SEED_USDC_ENERGYX", uint256(75_000_000));
+        uint256 usdcArcx    = vm.envOr("SEED_USDC_ARCX",    uint256(25_000_000));
 
         uint256 baseTechx   = (usdcTechx   * 1e20) / TECHX_PRICE;
         uint256 baseEnergyx = (usdcEnergyx * 1e20) / ENERGYX_PRICE;
