@@ -316,12 +316,12 @@ The currently deployed addresses on Arc Testnet (chain ID 5042002) from the Arc 
 
 | Contract | Address |
 |---|---|
-| PriceOracle | `0xf8149268c4cf3710ec8753191ead9bc46322ee77` |
-| SpotPoolFactory | `0x34d8dceb7d9638cc5be504f8540c25a143b51ac5` |
-| PerpEngine | `0x2b0bd350e8854779f3b72a526897be8847ba6b7b` |
-| TECHx (MockERC20) | `0xcf4fd3c37325756d71e85ab88f5e0394e134365c` |
-| ENERGYx (MockERC20) | `0x485cb7c7ea822366e35d119def803e5074bbfd5d` |
-| ARCx (MockERC20) | `0xe70d621729b3c306b8f97e75711c142bc3824ded` |
+| PriceOracle | `0xcE0062be693EefF4e021bb7a8014A0d30C47dF0a` |
+| SpotPoolFactory | `0x0ff9a151D9BE48d9222f9C680Ce4052E7c1f7b98` |
+| PerpEngine | `0xbF6Ea775808485A19282C662A00Dbbbcae756D2B` |
+| TECHx (MockERC20) | `0xCA70737705C71094827555a9b0015E05308F1326` |
+| ENERGYx (MockERC20) | `0xd463C6424c2776495A6EA88F575693D1fadcC5E6` |
+| ARCx (MockERC20) | `0x5642aC5570d6ee46D1ff86D499D0009370Fd0CAF` |
 | USDC (canonical) | `0x3600000000000000000000000000000000000000` |
 
 > These are the platform-wallet deploys. Running `Deploy.s.sol` from your own wallet will produce different addresses.

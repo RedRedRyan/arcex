@@ -8,7 +8,7 @@ import {PriceOracle} from "../PriceOracle.sol";
 /// @notice Owner-only. Use to simulate price moves on testnet.
 ///
 /// Required env vars:
-///   PRIVATE_KEY            — owner private key
+///   ARC_PRIVATE_KEY        — owner private key
 ///   PRICE_ORACLE_ADDRESS   — deployed PriceOracle address
 ///   PRICE_TECHX            — new TECHx price  (8 decimals, e.g. 155_00000000 = $155)
 ///   PRICE_ENERGYX          — new ENERGYx price (8 decimals, e.g. 72_00000000 = $72)
@@ -19,7 +19,7 @@ import {PriceOracle} from "../PriceOracle.sol";
 ///     --rpc-url arc_testnet --broadcast -vvvv
 contract UpdatePrices is Script {
     function run() external {
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
         PriceOracle oracle  = PriceOracle(vm.envAddress("PRICE_ORACLE_ADDRESS"));
 
         uint256 priceTechx   = vm.envUint("PRICE_TECHX");

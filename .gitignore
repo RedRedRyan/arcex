@@ -1,0 +1,12 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# JavaScript dependencies
+node_modules/
+
+# Foundry generated files
+contracts/cache/
+contracts/out/
+broadcast/

@@ -46,7 +46,7 @@ contract Deploy is Script {
 
     function run() external {
         // Load deployer key from env — never hard-code
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
         address usdc        = vm.envAddress("USDC_ADDRESS");
         bool skipSeed       = vm.envOr("SKIP_SEED", false);
@@ -68,7 +68,7 @@ contract Deploy is Script {
         console2.log("SpotPoolFactory      :", address(spotPool));
 
         // ── 3. PerpEngine ─────────────────────────────────────────────────
-        PerpEngine perp = new PerpEngine(address(oracle), deployer);
+        PerpEngine perp = new PerpEngine(usdc, address(oracle), deployer);
         console2.log("PerpEngine           :", address(perp));
 
         // ── 4. MockERC20 base tokens ──────────────────────────────────────
