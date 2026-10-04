@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useReadContract } from "wagmi";
 import { erc20Abi } from "viem";
 import { toast } from "sonner";
@@ -88,13 +88,31 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
     },
   });
 
-  // Approve
+  // ── Approve ─────────────────────────────────────────────────────────────
   const { writeContract: approve, data: approveHash, isPending: isApproving } = useWriteContract();
-  const { isLoading: isApproveConfirming } = useWaitForTransactionReceipt({ hash: approveHash });
+  const { isLoading: isApproveConfirming, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
 
-  // Swap
+  // Refetch allowance once the approve tx confirms (so button transitions to Buy/Sell)
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (wasConfirming.current && !isApproveConfirming && approveSuccess) {
+      refetchAllowance();
+    }
+    wasConfirming.current = isApproveConfirming;
+  }, [isApproveConfirming, approveSuccess, refetchAllowance]);
+
+  // ── Swap ────────────────────────────────────────────────────────────────
   const { writeContract: doSwap, data: swapHash, isPending: isSwapping } = useWriteContract();
   const { isLoading: isSwapConfirming, isSuccess: swapSuccess } = useWaitForTransactionReceipt({ hash: swapHash });
+
+  useEffect(() => {
+    if (swapSuccess && swapHash) {
+      toast.success("Swap confirmed!", { description: `${swapHash.slice(0, 14)}...` });
+      refetchUsdc();
+      refetchBase();
+      refetchAllowance();
+    }
+  }, [swapSuccess, swapHash, refetchUsdc, refetchBase, refetchAllowance]);
 
   const handleApprove = useCallback(() => {
     if (!address || !spender) return;
@@ -138,13 +156,6 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       });
     }
   }, [address, pairId, side, amountBigint, amountBaseIn, doSwap, poolActive, hasLiquidity]);
-
-  if (swapSuccess && swapHash) {
-    toast.success("Swap confirmed!", { description: `${swapHash.slice(0, 14)}...` });
-    refetchUsdc();
-    refetchBase();
-    refetchAllowance();
-  }
 
   const isLoading = isApproving || isApproveConfirming || isSwapping || isSwapConfirming;
 
