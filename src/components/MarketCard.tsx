@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import PriceChart from "./PriceChart";
 import { Pair } from "../types";
+import { useOracleFeed, usePoolFeed, formatPrice } from "../../data/OracleFeed";
 
 interface MarketCardProps {
   pair: Pair;
@@ -8,19 +9,29 @@ interface MarketCardProps {
   onFutures: () => void;
 }
 
-const SEED_META: Record<number, { change: string; positive: boolean; vol: string }> = {
-  0: { change: "+2.34%", positive: true,  vol: "$4.2M" },
-  1: { change: "-0.87%", positive: false, vol: "$1.8M" },
-  2: { change: "+5.12%", positive: true,  vol: "$920K" },
-};
+export default function MarketCard({
+  pair,
+  onSpot,
+  onFutures,
+}: MarketCardProps) {
+  const pool = usePoolFeed(pair.id);
+  const oracle = useOracleFeed(pair.id);
 
-export default function MarketCard({ pair, onSpot, onFutures }: MarketCardProps) {
-  const meta = SEED_META[pair.id] ?? { change: "—", positive: true, vol: "—" };
+  // The market price is the pool (what a buyer actually pays); fall back to the oracle
+  // only if the pool is empty/unreachable.
+  const usePool = pool.price !== null;
+  const feed = usePool ? pool : oracle;
+  const price = feed.price ?? pair.seedPrice;
+  const change = feed.changePct24h;
+  const positive = (change ?? 0) >= 0;
 
   return (
     <div
       className="flex flex-col rounded-2xl overflow-hidden"
-      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
     >
       {/* Header */}
       <div className="px-5 pt-5 pb-2 flex items-start justify-between">
@@ -36,32 +47,57 @@ export default function MarketCard({ pair, onSpot, onFutures }: MarketCardProps)
             {pair.ticker.slice(0, 2)}
           </div>
           <div>
-            <div className="font-semibold display text-sm" style={{ color: "var(--ink)" }}>
-              {pair.ticker}<span style={{ color: "var(--subtle)" }}>/USDC</span>
+            <div
+              className="font-semibold display text-sm"
+              style={{ color: "var(--ink)" }}
+            >
+              {pair.ticker}
+              <span style={{ color: "var(--subtle)" }}>/USDC</span>
             </div>
-            <div className="text-xs mt-0.5" style={{ color: "var(--subtle)" }}>{pair.name}</div>
+            <div className="text-xs mt-0.5" style={{ color: "var(--subtle)" }}>
+              {pair.name}
+            </div>
           </div>
         </div>
         <div className="text-right">
-          <div className="tabular mono font-bold text-xl" style={{ color: "var(--ink)" }}>
-            ${pair.seedPrice.toFixed(2)}
+          <div
+            className="tabular mono font-bold text-xl"
+            style={{ color: "var(--ink)" }}
+          >
+            ${formatPrice(price)}
           </div>
           <div
             className="text-xs font-semibold flex items-center justify-end gap-1 mt-0.5"
-            style={{ color: meta.positive ? "var(--success)" : "var(--danger)" }}
+            style={{
+              color:
+                change === null
+                  ? "var(--subtle)"
+                  : positive
+                    ? "var(--success)"
+                    : "var(--danger)",
+            }}
           >
-            {meta.positive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-            {meta.change}
+            {change !== null &&
+              (positive ? (
+                <TrendingUp size={11} />
+              ) : (
+                <TrendingDown size={11} />
+              ))}
+            {change === null
+              ? "—"
+              : `${positive ? "+" : ""}${change.toFixed(2)}%`}
+            <span style={{ color: "var(--subtle)", fontWeight: 400 }}>24h</span>
           </div>
         </div>
       </div>
 
-      {/* Sparkline — lightweight-charts area, pair's own synthetic price data */}
+      {/* Live sparkline — lightweight-charts area series on the same source as the price above */}
       <div style={{ height: 90, overflow: "hidden" }}>
         <PriceChart
-          seedPrice={pair.seedPrice}
           pairId={pair.id}
+          seedPrice={pair.seedPrice}
           variant="area"
+          source={usePool ? "pool" : "oracle"}
           height={90}
           accentColor={pair.color}
         />
@@ -69,16 +105,27 @@ export default function MarketCard({ pair, onSpot, onFutures }: MarketCardProps)
 
       {/* Stats row */}
       <div
-        className="mx-4 mb-3 px-3 py-2 rounded-xl grid grid-cols-2 gap-2 text-xs"
+        className="mx-4 mb-3 px-3 py-2 rounded-xl grid grid-cols-3 gap-2 text-xs"
         style={{ background: "var(--surface-muted)" }}
       >
         <div>
-          <span style={{ color: "var(--subtle)" }}>24h Vol</span>
-          <div className="tabular mono font-medium mt-0.5" style={{ color: "var(--ink-2)" }}>{meta.vol}</div>
+          <span style={{ color: "var(--subtle)" }}>24h Low</span>
+          <div
+            className="tabular mono font-medium mt-0.5"
+            style={{ color: "var(--ink-2)" }}
+          >
+            ${formatPrice(feed.low24h)}
+          </div>
         </div>
+
         <div className="text-right">
-          <span style={{ color: "var(--subtle)" }}>Oracle</span>
-          <div className="tabular mono font-medium mt-0.5" style={{ color: "var(--ink-2)" }}>${pair.seedPrice}</div>
+          <span style={{ color: "var(--subtle)" }}>24h High</span>
+          <div
+            className="tabular mono font-medium mt-0.5"
+            style={{ color: "var(--ink-2)" }}
+          >
+            ${formatPrice(feed.high24h)}
+          </div>
         </div>
       </div>
 
@@ -92,8 +139,12 @@ export default function MarketCard({ pair, onSpot, onFutures }: MarketCardProps)
             color: "var(--accent)",
             border: "1px solid rgba(251,79,31,0.25)",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(251,79,31,0.2)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(251,79,31,0.12)")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(251,79,31,0.2)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "rgba(251,79,31,0.12)")
+          }
         >
           Spot <ArrowRight size={13} />
         </button>
@@ -105,8 +156,12 @@ export default function MarketCard({ pair, onSpot, onFutures }: MarketCardProps)
             color: "var(--sunset)",
             border: "1px solid rgba(255,160,77,0.22)",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,160,77,0.18)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,160,77,0.10)")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(255,160,77,0.18)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "rgba(255,160,77,0.10)")
+          }
         >
           Futures <ArrowRight size={13} />
         </button>

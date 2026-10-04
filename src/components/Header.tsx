@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePoolFeed, formatPrice } from "../../data/OracleFeed";
 import { ConnectKitButton } from "connectkit";
 import { useAccount, useReadContract } from "wagmi";
 import { erc20Abi } from "viem";
@@ -15,14 +16,19 @@ interface HeaderProps {
 }
 
 const NAV: { key: Page; label: string }[] = [
-  { key: "market",    label: "Markets" },
-  { key: "spot",      label: "Spot" },
-  { key: "futures",   label: "Futures" },
+  { key: "market", label: "Markets" },
+  { key: "spot", label: "Spot" },
+  { key: "futures", label: "Futures" },
   { key: "portfolio", label: "Portfolio" },
-  { key: "faucet",    label: "Faucet" },
+  { key: "faucet", label: "Faucet" },
 ];
 
-export default function Header({ page, setPage, activePair, setActivePair }: HeaderProps) {
+export default function Header({
+  page,
+  setPage,
+  activePair,
+  setActivePair,
+}: HeaderProps) {
   const { address, isConnected, chainId } = useAccount();
   const [pairMenuOpen, setPairMenuOpen] = useState(false);
 
@@ -42,7 +48,10 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
   return (
     <header
       className="sticky top-0 z-50 flex items-center justify-between px-4 md:px-6 h-[60px]"
-      style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}
+      style={{
+        background: "var(--bg)",
+        borderBottom: "1px solid var(--border)",
+      }}
     >
       {/* Logo */}
       <button
@@ -51,7 +60,9 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
         style={{ color: "var(--ink)" }}
       >
         <BarChart2 size={20} style={{ color: "var(--accent)" }} />
-        <span>stockX <span style={{ color: "var(--accent)" }}>Pro</span></span>
+        <span>
+          stockX <span style={{ color: "var(--accent)" }}>Pro</span>
+        </span>
         <span
           className="text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
           style={{ background: "rgba(251,79,31,0.15)", color: "var(--accent)" }}
@@ -70,7 +81,10 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
             style={{
               background: page === key ? "rgba(251,79,31,0.12)" : "transparent",
               color: page === key ? "var(--accent)" : "var(--subtle)",
-              borderBottom: page === key ? "2px solid var(--accent)" : "2px solid transparent",
+              borderBottom:
+                page === key
+                  ? "2px solid var(--accent)"
+                  : "2px solid transparent",
             }}
           >
             {label}
@@ -92,28 +106,44 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
                 border: "1px solid var(--border)",
               }}
             >
-              <span className="w-2 h-2 rounded-full" style={{ background: currentPair.color }} />
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ background: currentPair.color }}
+              />
               {currentPair.ticker}/USDC
               <ChevronDown size={12} style={{ color: "var(--subtle)" }} />
             </button>
             {pairMenuOpen && (
               <div
                 className="absolute right-0 top-full mt-1 w-52 rounded-xl py-1 z-50"
-                style={{ background: "var(--surface-muted)", border: "1px solid var(--border)" }}
+                style={{
+                  background: "var(--surface-muted)",
+                  border: "1px solid var(--border)",
+                }}
               >
                 {PAIRS.map((pair) => (
                   <button
                     key={pair.id}
-                    onClick={() => { setActivePair(pair.id); setPairMenuOpen(false); }}
+                    onClick={() => {
+                      setActivePair(pair.id);
+                      setPairMenuOpen(false);
+                    }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors"
                     style={{
-                      background: activePair === pair.id ? "rgba(251,79,31,0.08)" : "transparent",
-                      color: activePair === pair.id ? "var(--ink)" : "var(--subtle)",
+                      background:
+                        activePair === pair.id
+                          ? "rgba(251,79,31,0.08)"
+                          : "transparent",
+                      color:
+                        activePair === pair.id ? "var(--ink)" : "var(--subtle)",
                     }}
                   >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: pair.color }} />
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: pair.color }}
+                    />
                     <span className="font-medium">{pair.ticker}/USDC</span>
-                    <span className="ml-auto text-xs" style={{ color: "var(--subtle)" }}>${pair.seedPrice}</span>
+                    <MenuPrice pairId={pair.id} fallback={pair.seedPrice} />
                   </button>
                 ))}
               </div>
@@ -125,7 +155,10 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
         {isWrongChain && (
           <div
             className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
-            style={{ background: "rgba(232,109,122,0.15)", color: "var(--danger)" }}
+            style={{
+              background: "rgba(232,109,122,0.15)",
+              color: "var(--danger)",
+            }}
           >
             <AlertTriangle size={11} />
             Wrong network
@@ -136,10 +169,18 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
         {isConnected && !isWrongChain && (
           <div
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink-2)" }}
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              color: "var(--ink-2)",
+            }}
           >
-            <span className="text-xs" style={{ color: "var(--subtle)" }}>USDC</span>
-            <span className="mono tabular font-semibold">{formatUsdc(usdcBalance)}</span>
+            <span className="text-xs" style={{ color: "var(--subtle)" }}>
+              USDC
+            </span>
+            <span className="mono tabular font-semibold">
+              {formatUsdc(usdcBalance)}
+            </span>
           </div>
         )}
 
@@ -150,7 +191,9 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
               onClick={show}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
               style={{
-                background: isConnected ? "var(--surface-strong)" : "var(--accent)",
+                background: isConnected
+                  ? "var(--surface-strong)"
+                  : "var(--accent)",
                 color: isConnected ? "var(--ink)" : "#fff",
                 border: isConnected ? "1px solid var(--border)" : "none",
               }}
@@ -165,5 +208,14 @@ export default function Header({ page, setPage, activePair, setActivePair }: Hea
         </ConnectKitButton.Custom>
       </div>
     </header>
+  );
+}
+
+function MenuPrice({ pairId, fallback }: { pairId: number; fallback: number }) {
+  const pool = usePoolFeed(pairId);
+  return (
+    <span className="ml-auto text-xs" style={{ color: "var(--subtle)" }}>
+      ${formatPrice(pool.price ?? fallback)}
+    </span>
   );
 }
