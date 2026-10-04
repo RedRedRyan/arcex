@@ -1,39 +1,60 @@
-import { useReadContract } from "wagmi";
 import { PAIRS } from "../constants";
 import MarketCard from "../components/MarketCard";
 import { PairId } from "../types";
-import { CONTRACT_ADDRESSES, ARC_TESTNET_CHAIN_ID } from "../constants";
-import PRICE_ORACLE_ABI from "../../contracts/out/PriceOracle.sol/PriceOracle.json";
+import {
+  useOracleFeed,
+  usePoolFeed,
+  formatPrice,
+  formatAgo,
+} from "../../data/OracleFeed";
 
 interface MarketPageProps {
   onSpot: (pairId: PairId) => void;
   onFutures: (pairId: PairId) => void;
 }
 
-// Read live oracle price for a single pair
-function useOraclePrice(pairId: number) {
-  const { data } = useReadContract({
-    address: CONTRACT_ADDRESSES.priceOracle,
-    abi: PRICE_ORACLE_ABI.abi,
-    functionName: "getMarkPrice",
-    args: [pairId],
-    chainId: ARC_TESTNET_CHAIN_ID,
-    query: { refetchInterval: 10_000 },
-  });
-  if (typeof data === "bigint") {
-    // Oracle stores price with 8 decimals
-    return Number(data) / 1e8;
-  }
-  return null;
-}
-
-function LivePriceBadge({ pairId, seedPrice }: { pairId: number; seedPrice: number }) {
-  const live = useOraclePrice(pairId);
-  const price = live ?? seedPrice;
+function LivePriceBadge({
+  pairId,
+  seedPrice,
+}: {
+  pairId: number;
+  seedPrice: number;
+}) {
+  const pool = usePoolFeed(pairId);
+  const oracle = useOracleFeed(pairId);
+  const price = pool.price ?? oracle.price ?? seedPrice;
+  const live = pool.status === "live" || oracle.status === "live";
   return (
-    <span className="tabular mono font-semibold text-sm" style={{ color: "var(--ink)" }}>
-      ${price.toFixed(2)}
-    </span>
+    <div>
+      <div className="flex items-baseline gap-2">
+        <span
+          className="tabular mono font-semibold text-sm"
+          style={{ color: "var(--ink)" }}
+        >
+          ${formatPrice(price)}
+        </span>
+        <span
+          className="text-xs"
+          style={{
+            color: live ? "var(--success)" : "var(--subtle)",
+            fontSize: "10px",
+          }}
+        >
+          {pool.status === "connecting" && oracle.status === "connecting"
+            ? "connecting…"
+            : live
+              ? "live"
+              : "offline"}
+        </span>
+      </div>
+      <div
+        className="text-xs mt-0.5"
+        style={{ color: "var(--subtle)", fontSize: "10px" }}
+      >
+        Oracle ${formatPrice(oracle.price)} · set{" "}
+        {formatAgo(oracle.oracleUpdatedAt)}
+      </div>
+    </div>
   );
 }
 
@@ -50,7 +71,8 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
             Markets
           </h1>
           <p className="text-sm" style={{ color: "var(--subtle)" }}>
-            Trade synthetic assets on Arc Testnet · settled in USDC · oracle-priced
+            Trade synthetic assets on Arc Testnet · settled in USDC · spot
+            priced by the AMM, perps by the oracle
           </p>
         </div>
         <div
@@ -65,7 +87,7 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
         </div>
       </div>
 
-      {/* Live oracle price strip */}
+      {/* Live price strip (spot pool price, oracle underneath) */}
       <div
         className="rounded-2xl px-6 py-4 grid grid-cols-3 divide-x"
         style={{
@@ -80,7 +102,10 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
                 className="w-2 h-2 rounded-full"
                 style={{ background: pair.color }}
               />
-              <span className="text-xs font-semibold display" style={{ color: "var(--subtle)" }}>
+              <span
+                className="text-xs font-semibold display"
+                style={{ color: "var(--subtle)" }}
+              >
                 {pair.ticker}/USDC
               </span>
               <span
@@ -92,7 +117,7 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
                   letterSpacing: "0.05em",
                 }}
               >
-                ORACLE
+                SPOT
               </span>
             </div>
             <LivePriceBadge pairId={pair.id} seedPrice={pair.seedPrice} />
@@ -115,7 +140,10 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
       {/* Info strip */}
       <div
         className="rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+        }}
       >
         <InfoCard
           title="Spot AMM"
@@ -137,7 +165,15 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
   );
 }
 
-function InfoCard({ title, body, accent }: { title: string; body: string; accent: string }) {
+function InfoCard({
+  title,
+  body,
+  accent,
+}: {
+  title: string;
+  body: string;
+  accent: string;
+}) {
   return (
     <div>
       <div
