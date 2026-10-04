@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { PAIRS } from "../constants";
 import MarketCard from "../components/MarketCard";
 import { PairId } from "../types";
@@ -8,22 +9,12 @@ import {
   formatAgo,
 } from "../../data/OracleFeed";
 
-interface MarketPageProps {
-  onSpot: (pairId: PairId) => void;
-  onFutures: (pairId: PairId) => void;
-}
-
-function LivePriceBadge({
-  pairId,
-  seedPrice,
-}: {
-  pairId: number;
-  seedPrice: number;
-}) {
+const LivePriceBadge = ({ pairId }: { pairId: number }) => {
   const pool = usePoolFeed(pairId);
   const oracle = useOracleFeed(pairId);
-  const price = pool.price ?? oracle.price ?? seedPrice;
+  const price = pool.price ?? oracle.price;
   const live = pool.status === "live" || oracle.status === "live";
+
   return (
     <div>
       <div className="flex items-baseline gap-2">
@@ -56,11 +47,40 @@ function LivePriceBadge({
       </div>
     </div>
   );
-}
+};
 
-export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
+const InfoCard = ({
+  title,
+  body,
+  accent,
+}: {
+  title: string;
+  body: string;
+  accent: string;
+}) => {
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl">
+    <div>
+      <div
+        className="text-sm font-semibold display mb-1.5"
+        style={{ color: accent }}
+      >
+        {title}
+      </div>
+      <p className="text-sm leading-relaxed" style={{ color: "var(--subtle)" }}>
+        {body}
+      </p>
+    </div>
+  );
+};
+
+const MarketPage = () => {
+  const navigate = useNavigate();
+
+  const goSpot = (pairId: PairId) => navigate(`/spot?pair=${pairId}`);
+  const goFutures = (pairId: PairId) => navigate(`/futures?pair=${pairId}`);
+
+  return (
+    <div className="container mx-auto px-4 md:px-6 py-28 space-y-8 max-w-screen-2xl">
       {/* Hero */}
       <div className="flex items-end justify-between">
         <div>
@@ -71,7 +91,7 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
             Markets
           </h1>
           <p className="text-sm" style={{ color: "var(--subtle)" }}>
-            Trade synthetic assets on Arc Testnet · settled in USDC · spot
+            Trade simulated assets on Arc Testnet · settled in USDC · spot
             priced by the AMM, perps by the oracle
           </p>
         </div>
@@ -120,7 +140,7 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
                 SPOT
               </span>
             </div>
-            <LivePriceBadge pairId={pair.id} seedPrice={pair.seedPrice} />
+            <LivePriceBadge pairId={pair.id} />
           </div>
         ))}
       </div>
@@ -131,8 +151,8 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
           <MarketCard
             key={pair.id}
             pair={{ ...pair }}
-            onSpot={() => onSpot(pair.id)}
-            onFutures={() => onFutures(pair.id)}
+            onSpot={() => goSpot(pair.id)}
+            onFutures={() => goFutures(pair.id)}
           />
         ))}
       </div>
@@ -152,7 +172,7 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
         />
         <InfoCard
           title="Perpetuals"
-          body="Up to 20× leverage. Isolated margin per position. Funding rates keep perp price anchored to oracle."
+          body="Up to 20× leverage. Isolated margin per position. Perp mark price comes from the on-chain oracle."
           accent="#ffa04d"
         />
         <InfoCard
@@ -163,28 +183,6 @@ export default function MarketPage({ onSpot, onFutures }: MarketPageProps) {
       </div>
     </div>
   );
-}
+};
 
-function InfoCard({
-  title,
-  body,
-  accent,
-}: {
-  title: string;
-  body: string;
-  accent: string;
-}) {
-  return (
-    <div>
-      <div
-        className="text-sm font-semibold display mb-1.5"
-        style={{ color: accent }}
-      >
-        {title}
-      </div>
-      <p className="text-sm leading-relaxed" style={{ color: "var(--subtle)" }}>
-        {body}
-      </p>
-    </div>
-  );
-}
+export default MarketPage;

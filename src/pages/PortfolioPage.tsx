@@ -1,12 +1,18 @@
 import { useAccount, useReadContract } from "wagmi";
 import { erc20Abi } from "viem";
 import { ConnectKitButton } from "connectkit";
-import { ARC_TESTNET_CHAIN_ID, ARC_USDC_ADDRESS, CONTRACT_ADDRESSES, PAIRS, BASE_TOKENS } from "../constants";
+import {
+  ARC_TESTNET_CHAIN_ID,
+  ARC_USDC_ADDRESS,
+  CONTRACT_ADDRESSES,
+  PAIRS,
+  BASE_TOKENS,
+} from "../constants";
 import { formatUsdc } from "../utils";
 import PositionsTable from "../components/PositionsTable";
 import PerpEngineArtifact from "../../contracts/out/PerpEngine.sol/PerpEngine.json";
 
-function BaseTokenBalance({ pairId }: { pairId: number }) {
+const BaseTokenBalance = ({ pairId }: { pairId: number }) => {
   const { address, isConnected } = useAccount();
   const pair = PAIRS[pairId as 0 | 1 | 2];
   const tokenAddr = BASE_TOKENS[pairId];
@@ -25,7 +31,10 @@ function BaseTokenBalance({ pairId }: { pairId: number }) {
   return (
     <div
       className="flex items-center justify-between px-4 py-3 rounded-xl"
-      style={{ background: "var(--surface-muted)", border: "1px solid var(--border)" }}
+      style={{
+        background: "var(--surface-muted)",
+        border: "1px solid var(--border)",
+      }}
     >
       <div className="flex items-center gap-3">
         <div
@@ -35,19 +44,68 @@ function BaseTokenBalance({ pairId }: { pairId: number }) {
           {pair.ticker.slice(0, 2)}
         </div>
         <div>
-          <div className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{pair.ticker}</div>
-          <div className="text-xs" style={{ color: "var(--subtle)" }}>{pair.name}</div>
+          <div
+            className="text-sm font-semibold"
+            style={{ color: "var(--ink)" }}
+          >
+            {pair.ticker}
+          </div>
+          <div className="text-xs" style={{ color: "var(--subtle)" }}>
+            {pair.name}
+          </div>
         </div>
       </div>
       <div className="text-right">
-        <div className="tabular mono font-semibold" style={{ color: "var(--ink-2)" }}>{formatted}</div>
-        <div className="text-xs" style={{ color: "var(--subtle)" }}>{pair.ticker}</div>
+        <div
+          className="tabular mono font-semibold"
+          style={{ color: "var(--ink-2)" }}
+        >
+          {formatted}
+        </div>
+        <div className="text-xs" style={{ color: "var(--subtle)" }}>
+          {pair.ticker}
+        </div>
       </div>
     </div>
   );
-}
+};
 
-export default function PortfolioPage() {
+const BalanceCard = ({
+  label,
+  value,
+  sublabel,
+  color,
+}: {
+  label: string;
+  value: string;
+  sublabel: string;
+  color: string;
+}) => {
+  return (
+    <div
+      className="rounded-2xl p-5"
+      style={{
+        background: "var(--surface-strong)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div className="text-xs mb-2" style={{ color: "var(--subtle)" }}>
+        {label}
+      </div>
+      <div
+        className="tabular mono font-bold text-2xl display mb-1"
+        style={{ color }}
+      >
+        {value}
+      </div>
+      <div className="text-xs" style={{ color: "var(--subtle)" }}>
+        {sublabel}
+      </div>
+    </div>
+  );
+};
+
+const PortfolioPage = () => {
   const { address, isConnected } = useAccount();
 
   const { data: usdcBalance } = useReadContract({
@@ -65,15 +123,24 @@ export default function PortfolioPage() {
     functionName: "marginAccounts",
     args: address ? [address] : undefined,
     chainId: ARC_TESTNET_CHAIN_ID,
-    query: { enabled: isConnected && !!address && !!CONTRACT_ADDRESSES.perpEngine },
+    query: {
+      enabled: isConnected && !!address && !!CONTRACT_ADDRESSES.perpEngine,
+    },
   });
 
   if (!isConnected) {
     return (
       <div className="container mx-auto px-4 md:px-6 py-20 flex flex-col items-center gap-6 max-w-screen-2xl">
         <div className="text-center space-y-2">
-          <h1 className="display text-2xl font-bold" style={{ color: "var(--ink)" }}>Portfolio</h1>
-          <p className="text-sm" style={{ color: "var(--subtle)" }}>Connect your wallet to view your balances and positions</p>
+          <h1
+            className="display text-2xl font-bold"
+            style={{ color: "var(--ink)" }}
+          >
+            Portfolio
+          </h1>
+          <p className="text-sm" style={{ color: "var(--subtle)" }}>
+            Connect your wallet to view your balances and positions
+          </p>
         </div>
         <ConnectKitButton />
       </div>
@@ -82,7 +149,10 @@ export default function PortfolioPage() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl">
-      <h1 className="display text-2xl font-bold" style={{ color: "var(--ink)", letterSpacing: "-0.03em" }}>
+      <h1
+        className="display text-2xl font-bold"
+        style={{ color: "var(--ink)", letterSpacing: "-0.03em" }}
+      >
         Portfolio
       </h1>
 
@@ -103,7 +173,8 @@ export default function PortfolioPage() {
         <BalanceCard
           label="Net Worth"
           value={`$${(
-            (Number(usdcBalance ?? 0n) + Number(marginBalance ?? 0n)) / 1e6
+            (Number(usdcBalance ?? 0n) + Number(marginBalance ?? 0n)) /
+            1e6
           ).toFixed(2)}`}
           sublabel="USDC equivalent"
           color="var(--success)"
@@ -112,7 +183,10 @@ export default function PortfolioPage() {
 
       {/* Spot holdings */}
       <div>
-        <h2 className="display text-lg font-semibold mb-3" style={{ color: "var(--ink)" }}>
+        <h2
+          className="display text-lg font-semibold mb-3"
+          style={{ color: "var(--ink)" }}
+        >
           Spot Holdings
         </h2>
         <div className="space-y-2">
@@ -124,24 +198,16 @@ export default function PortfolioPage() {
 
       {/* Futures positions */}
       <div>
-        <h2 className="display text-lg font-semibold mb-3" style={{ color: "var(--ink)" }}>
+        <h2
+          className="display text-lg font-semibold mb-3"
+          style={{ color: "var(--ink)" }}
+        >
           Open Futures Positions
         </h2>
         <PositionsTable />
       </div>
     </div>
   );
-}
+};
 
-function BalanceCard({ label, value, sublabel, color }: { label: string; value: string; sublabel: string; color: string }) {
-  return (
-    <div
-      className="rounded-2xl p-5"
-      style={{ background: "var(--surface-strong)", border: "1px solid var(--border)" }}
-    >
-      <div className="text-xs mb-2" style={{ color: "var(--subtle)" }}>{label}</div>
-      <div className="tabular mono font-bold text-2xl display mb-1" style={{ color }}>{value}</div>
-      <div className="text-xs" style={{ color: "var(--subtle)" }}>{sublabel}</div>
-    </div>
-  );
-}
+export default PortfolioPage;

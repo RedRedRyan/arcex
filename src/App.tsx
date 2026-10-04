@@ -1,41 +1,37 @@
-import { useState } from "react";
-import Header from "./components/Header";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
+import Navbar from "./components/Navbar";
 import MarketPage from "./pages/MarketPage";
 import SpotPage from "./pages/SpotPage";
 import FuturesPage from "./pages/FuturesPage";
 import PortfolioPage from "./pages/PortfolioPage";
 import FaucetPage from "./pages/FaucetPage";
-import { Page, PairId } from "./types";
 
-export default function App() {
-  const [page, setPage] = useState<Page>("market");
-  const [activePair, setActivePair] = useState<PairId>(0);
-
-  const goToSpot = (pairId: PairId) => {
-    setActivePair(pairId);
-    setPage("spot");
-  };
-
-  const goToFutures = (pairId: PairId) => {
-    setActivePair(pairId);
-    setPage("futures");
-  };
-
+// Shared shell: navbar on every route, page content rendered in <Outlet />
+const Layout = () => {
   return (
-    <div className="min-h-dvh" style={{ background: "var(--bg)" }}>
-      <Header
-        page={page}
-        setPage={setPage}
-        activePair={activePair}
-        setActivePair={setActivePair}
-      />
+    <>
+      <Navbar />
       <main>
-        {page === "market"    && <MarketPage onSpot={goToSpot} onFutures={goToFutures} />}
-        {page === "spot"      && <SpotPage activePair={activePair} setActivePair={setActivePair} />}
-        {page === "futures"   && <FuturesPage activePair={activePair} setActivePair={setActivePair} />}
-        {page === "portfolio" && <PortfolioPage />}
-        {page === "faucet"    && <FaucetPage />}
+        <Outlet />
       </main>
-    </div>
+    </>
   );
-}
+};
+
+// Paths match `navLinks` in constants.ts
+const App = () => {
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<MarketPage />} />
+        <Route path="spot" element={<SpotPage />} />
+        <Route path="futures" element={<FuturesPage />} />
+        <Route path="portfolio" element={<PortfolioPage />} />
+        <Route path="faucet" element={<FaucetPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+};
+
+export default App;

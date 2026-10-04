@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import PriceChart from "../components/PriceChart";
 import SpotTicket from "../components/SpotTicket";
 import OrderBook from "../components/OrderBook";
@@ -5,12 +6,14 @@ import PairHeader from "../components/PairHeader";
 import { PAIRS } from "../constants";
 import { PairId } from "../types";
 
-interface SpotPageProps {
-  activePair: PairId;
-  setActivePair: (id: PairId) => void;
-}
+const SpotPage = () => {
+  // Active pair lives in the URL: /spot?pair=1
+  const [params, setParams] = useSearchParams();
+  const raw = Number(params.get("pair"));
+  const activePair = (raw === 1 || raw === 2 ? raw : 0) as PairId;
+  const setActivePair = (id: PairId) =>
+    setParams({ pair: String(id) }, { replace: true });
 
-export default function SpotPage({ activePair, setActivePair }: SpotPageProps) {
   const pair = PAIRS[activePair];
 
   return (
@@ -34,7 +37,6 @@ export default function SpotPage({ activePair, setActivePair }: SpotPageProps) {
             }}
           >
             <PriceChart
-              seedPrice={pair.seedPrice}
               pairId={pair.id}
               variant="candle"
               source="pool"
@@ -55,4 +57,6 @@ export default function SpotPage({ activePair, setActivePair }: SpotPageProps) {
       </div>
     </div>
   );
-}
+};
+
+export default SpotPage;

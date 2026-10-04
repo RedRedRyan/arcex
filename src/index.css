@@ -2,19 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Arc Dark tokens — stockX Pro trading app */
+/* =========================
+   Custom Utilities
+   ========================= */
+
+@utility flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@utility col-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+@utility abs-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* =========================
+   Arc Dark Tokens
+   ========================= */
+
 :root {
   --bg: #0a0f1a;
+
   --bg-gradient: linear-gradient(180deg, #0a0f1a 0%, #0d1420 58%, #111927 100%);
+
   --surface: rgba(255, 255, 255, 0.055);
-  --surface-strong: rgba(255, 255, 255, 0.10);
+  --surface-strong: rgba(255, 255, 255, 0.1);
   --surface-muted: #131c2e;
+
   --ink: #f9faf3;
   --ink-2: #e3ecf9;
   --muted: #cbd5e1;
   --subtle: #94a3b8;
+
   --border: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(251, 79, 31, 0.35);
+
   /* Orange accent palette */
   --accent: #fb4f1f;
   --accent-hover: #ff6a3d;
@@ -23,55 +55,135 @@
   --sunset: #ffa04d;
   --flame: #ff6a3d;
   --tangerine: #ffb347;
+
   /* Semantic */
   --success: #8dd89f;
   --danger: #e86d7a;
 }
 
+/* =========================
+   Global
+   ========================= */
+
 * {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--ink);
-  min-height: 100dvh;
+html {
+  min-height: 100%;
 }
 
-.display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
-.mono { font-family: 'JetBrains Mono', Menlo, monospace; }
+body {
+  margin: 0;
+  min-height: 100dvh;
 
-/* TradingView widget */
+  font-family: "DM Sans", sans-serif;
+
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* =========================
+   Typography
+   ========================= */
+
+.display {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.mono {
+  font-family: "JetBrains Mono", Menlo, monospace;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================
+   TradingView Widget
+   ========================= */
+
 .tv-widget-container {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
   background: #0f1922;
 }
+
 .tv-widget-container iframe {
   width: 100% !important;
   border: none;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+/* =========================
+   Scrollbar
+   ========================= */
 
-/* Tabular numbers for prices */
-.tabular { font-variant-numeric: tabular-nums; }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-/* Glass card */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* =========================
+   Glass Cards
+   ========================= */
+
 .glass {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
 }
+
 .glass-strong {
   background: var(--surface-strong);
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+
+/* =========================
+   Components
+   ========================= */
+
+@layer components {
+  main {
+    @apply w-full overflow-x-hidden;
+  }
+
+  nav {
+    @apply fixed z-50 w-full;
+  }
+
+  nav > div {
+    @apply flex md:flex-row flex-col md:justify-between items-center gap-5 py-5 lg:px-0 px-5 container mx-auto;
+  }
+
+  nav p {
+    @apply font-bold text-3xl -mb-2;
+  }
+
+  nav a {
+    @apply cursor-pointer text-nowrap md:text-base text-sm;
+  }
+
+  nav a.active {
+    color: var(--accent);
+  }
+
+  nav ul {
+    @apply flex justify-center items-center lg:gap-12 gap-7;
+  }
 }
