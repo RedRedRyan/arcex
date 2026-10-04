@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useReadContract } from "wagmi";
 import { erc20Abi } from "viem";
 import { toast } from "sonner";
@@ -120,16 +120,20 @@ export default function FuturesTicket({ pairId }: FuturesTicketProps) {
     });
   }, [doOpen, pairId, side, sizeUsdc, leverage, address]);
 
-  // After deposit confirmed → open position
-  if (depositSuccess && depositHash && !openHash) {
-    handleOpenPosition();
-  }
-  if (openSuccess && openHash) {
-    toast.success("Position opened!", { description: `${openHash.slice(0, 14)}...` });
-    refetchMargin();
-    refetchPos();
-    refetchAllowance();
-  }
+  // After deposit confirmed → open position (only fire once)
+    const posOpenedRef = useRef(false);
+    if (depositSuccess && depositHash && !openHash && !posOpenedRef.current) {
+      posOpenedRef.current = true;
+      handleOpenPosition();
+    }
+    useEffect(() => {
+      if (openSuccess && openHash) {
+        toast.success("Position opened!", { description: `${openHash.slice(0, 14)}...` });
+        refetchMargin();
+        refetchPos();
+        refetchAllowance();
+      }
+    }, [openSuccess, openHash]);
 
   const isLoading = isApproving || isApproveConfirming || isDepositing || isDepositConfirming || isOpening || isOpenConfirming;
 
