@@ -5,12 +5,14 @@ import SpotPage from "./pages/SpotPage";
 import FuturesPage from "./pages/FuturesPage";
 import PortfolioPage from "./pages/PortfolioPage";
 import FaucetPage from "./pages/FaucetPage";
+import Header from "./components/Header";
+import Home from "./pages/Home";
 
 // Shared shell: navbar on every route, page content rendered in <Outlet />
 const Layout = () => {
   return (
     <>
-      <Navbar />
+      <Header />
       <main>
         <Outlet />
       </main>
@@ -23,6 +25,7 @@ const App = () => {
   return (
     <Routes>
       <Route element={<Layout />}>
+        {/* <Route path="/" element={<Home />} /> */}
         <Route path="/" element={<MarketPage />} />
         <Route path="spot" element={<SpotPage />} />
         <Route path="futures" element={<FuturesPage />} />

@@ -80,7 +80,7 @@ const MarketPage = () => {
   const goFutures = (pairId: PairId) => navigate(`/futures?pair=${pairId}`);
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-28 space-y-8 max-w-screen-2xl">
+    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl">
       {/* Hero */}
       <div className="flex items-end justify-between">
         <div>

@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@theme {
+  --color-orange: #fb4f1f;
+  --color-oranged: #ff7518;
+  --color-sunset: #ffa04d;
+  --color-flame: #ff6a3d;
+  --color-tangerine: #ffb347;
+}
 /* =========================
    Custom Utilities
    ========================= */
@@ -24,6 +31,31 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+@layer utilities {
+  .container {
+    @apply mx-auto max-w-screen-2xl px-4 md:px-6 lg:px-8;
+  }
+  .yellow-btn {
+    @apply h-12 cursor-pointer bg-gradient-to-b from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-gray-950 font-medium text-base rounded-lg shadow-lg disabled:opacity-50;
+  }
+  .orange-btn {
+    @apply h-10 cursor-pointer bg-[#ff7518] hover:bg-[#fb4f1f] text-white font-medium text-base rounded-3xl shadow-lg disabled:opacity-50;
+  }
+
+  .header {
+    @apply z-50 w-full h-[70px];
+  }
+  .header-wrapper {
+    @apply flex justify-between items-center px-6 py-4 text-gray-500;
+  }
+  .home-wrapper {
+    @apply text-gray-400 flex-col gap-4 md:gap-10 items-center sm:items-start;
+  }
+  .home-section {
+    @apply w-full gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3;
+  }
 }
 
 /* =========================
@@ -163,27 +195,7 @@ body {
     @apply w-full overflow-x-hidden;
   }
 
-  nav {
-    @apply fixed z-50 w-full;
-  }
-
-  nav > div {
-    @apply flex md:flex-row flex-col md:justify-between items-center gap-5 py-5 lg:px-0 px-5 container mx-auto;
-  }
-
-  nav p {
-    @apply font-bold text-3xl -mb-2;
-  }
-
-  nav a {
-    @apply cursor-pointer text-nowrap md:text-base text-sm;
-  }
-
-  nav a.active {
+  .header-nav a.active {
     color: var(--accent);
-  }
-
-  nav ul {
-    @apply flex justify-center items-center lg:gap-12 gap-7;
   }
 }

@@ -1,3 +1,5 @@
+import { href } from "react-router-dom";
+
 export const ARC_TESTNET_CHAIN_ID = 5042002;
 export const ARC_USDC_ADDRESS =
   "0x3600000000000000000000000000000000000000" as const;
@@ -42,3 +44,12 @@ export const navLinks = [
   { path: "/portfolio", title: "Portfolio" },
   { path: "/faucet", title: "Faucet" },
 ] as const;
+
+export const NAV_ITEMS = [
+  { href: "/", label: "Markets" },
+  { href: "/spot", label: "Spot" },
+  { href: "/futures", label: "Futures" },
+  { href: "/portfolio", label: "Portfolio" },
+  // { href: "/faucet", label: "Faucet" },
+  // { href: '/watchlist', label: 'Watchlist' },
+];

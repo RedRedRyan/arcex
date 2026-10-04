@@ -132,12 +132,7 @@ const PortfolioPage = () => {
     return (
       <div className="container mx-auto px-4 md:px-6 py-20 flex flex-col items-center gap-6 max-w-screen-2xl">
         <div className="text-center space-y-2">
-          <h1
-            className="display text-2xl font-bold"
-            style={{ color: "var(--ink)" }}
-          >
-            Portfolio
-          </h1>
+          <h1 className="display text-2xl font-bold text-orange">Portfolio</h1>
           <p className="text-sm" style={{ color: "var(--subtle)" }}>
             Connect your wallet to view your balances and positions
           </p>

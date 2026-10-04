@@ -5,7 +5,7 @@ import OrderBook from "../components/OrderBook";
 import PairHeader from "../components/PairHeader";
 import PositionsTable from "../components/PositionsTable";
 import { PAIRS } from "../constants";
-import { Pair, PairId } from "../types";
+import { PairId } from "../types";
 
 // Flip to false to enable the full futures trading page.
 const COMING_SOON = true;
