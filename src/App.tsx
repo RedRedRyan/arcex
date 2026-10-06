@@ -8,10 +8,13 @@ import FaucetPage from "./pages/FaucetPage";
 import Header from "./components/Header";
 import Hero from "./pages/Hero";
 import Grainient from "./components/Grainient";
+import { Analytics } from "@vercel/analytics/next";
 // Shared shell: navbar on every route, page content rendered in <Outlet />
 const Layout = () => {
   return (
     <>
+      <Analytics />
+
       <div className="absolute inset-0 -z-10">
         <Grainient
           color1="#FB4F1F"
