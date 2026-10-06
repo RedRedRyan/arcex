@@ -8,6 +8,7 @@ const Hero = () => {
     <main>
       <Home />
       <About />
+      <Footer />
     </main>
   );
 };

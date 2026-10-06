@@ -71,8 +71,9 @@ const Home = () => {
           </div>
         </div>
         <div className=" hidden lg:block  col-span-1 lg:col-span-1">
-          <h1 className="text-8xl md:text-[12vw] leading-none text-center text-gradient">
-            NBX
+          <h1 className="text-4xl md:text-[4vw] leading-none text-center text-gradient">
+            Simulated <br />
+            Assets
           </h1>
         </div>
       </section>
