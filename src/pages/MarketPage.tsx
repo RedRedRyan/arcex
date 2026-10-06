@@ -8,6 +8,7 @@ import {
   formatPrice,
   formatAgo,
 } from "../../data/OracleFeed";
+import AssetCard from "@/components/AssetCard";
 
 const LivePriceBadge = ({ pairId }: { pairId: number }) => {
   const pool = usePoolFeed(pairId);
@@ -80,7 +81,7 @@ const MarketPage = () => {
   const goFutures = (pairId: PairId) => navigate(`/futures?pair=${pairId}`);
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl">
+    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl bg-transparent">
       {/* Hero */}
       <div className="flex items-end justify-between">
         <div>
@@ -109,9 +110,8 @@ const MarketPage = () => {
 
       {/* Live price strip (spot pool price, oracle underneath) */}
       <div
-        className="rounded-2xl px-6 py-4 grid grid-cols-3 divide-x"
+        className="rounded-2xl px-6 py-4 grid grid-cols-3 divide-x bg-orange-500"
         style={{
-          background: "var(--surface)",
           border: "1px solid var(--border)",
         }}
       >
@@ -143,6 +143,15 @@ const MarketPage = () => {
             <LivePriceBadge pairId={pair.id} />
           </div>
         ))}
+      </div>
+
+      <div className="relative isolate">
+        {/* two blurred gradient blobs sit behind the cards (aria-hidden, -z-10) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {PAIRS.map((pair) => (
+            <AssetCard key={pair.id} pair={{ ...pair }} />
+          ))}
+        </div>
       </div>
 
       {/* Pair cards with lightweight-charts sparklines */}

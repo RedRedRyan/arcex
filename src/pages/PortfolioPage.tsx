@@ -157,7 +157,7 @@ const PortfolioPage = () => {
           label="Wallet USDC"
           value={`$${formatUsdc(usdcBalance)}`}
           sublabel="Available in wallet"
-          color="var(--accent)"
+          color="white"
         />
         <BalanceCard
           label="Deposited Margin"

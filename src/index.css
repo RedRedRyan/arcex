@@ -45,16 +45,22 @@
   }
 
   .header {
-    @apply z-50 w-full h-[70px];
+    @apply z-50 w-full h-[60px];
   }
   .header-wrapper {
-    @apply flex justify-between items-center px-6 py-4 text-gray-500;
+    @apply flex justify-between items-center px-6 py-2 text-gray-500;
   }
   .home-wrapper {
     @apply text-gray-400 flex-col gap-4 md:gap-10 items-center sm:items-start;
   }
   .home-section {
-    @apply w-full gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3;
+    @apply grid w-full grid-cols-1 gap-3 lg:grid-cols-4;
+  }
+  .spot-section {
+    @apply grid w-full grid-cols-1 gap-3 lg:grid-cols-3;
+  }
+  #about {
+    @apply min-h-screen bg-black;
   }
 }
 
@@ -63,7 +69,7 @@
    ========================= */
 
 :root {
-  --bg: #0a0f1a;
+  --bg: #000000;
 
   --bg-gradient: linear-gradient(180deg, #0a0f1a 0%, #0d1420 58%, #111927 100%);
 

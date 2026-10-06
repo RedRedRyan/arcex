@@ -53,3 +53,20 @@ export const NAV_ITEMS = [
   // { href: "/faucet", label: "Faucet" },
   // { href: '/watchlist', label: 'Watchlist' },
 ];
+export const socials = [
+  {
+    name: "Youtube",
+    icon: "/images/youtube.png",
+    url: "https://www.youtube.com/@NBX_Exchange",
+  },
+  {
+    name: "X (Twitter)",
+    icon: "/images/x.png",
+    url: "https://x.com/NBX_Exchange",
+  },
+  {
+    name: "LinkedIn",
+    icon: "/images/linkedin.png",
+    url: "https://www.linkedin.com/company/nairobi-block-exchange/",
+  },
+];

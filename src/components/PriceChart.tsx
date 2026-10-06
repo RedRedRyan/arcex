@@ -20,7 +20,8 @@ interface PriceChartProps {
   pairId: number;
   /** "candle" = full candlestick chart (trade pages), "area" = mini sparkline */
   variant?: "candle" | "area";
-  height?: number;
+  /** Pixels, or any CSS size such as "100%" to fill the parent. */
+  height?: number | string;
   className?: string;
   accentColor?: string;
   /** Used only to size the price axis before the first read lands. */
