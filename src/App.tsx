@@ -8,7 +8,7 @@ import FaucetPage from "./pages/FaucetPage";
 import Header from "./components/Header";
 import Hero from "./pages/Hero";
 import Grainient from "./components/Grainient";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 // Shared shell: navbar on every route, page content rendered in <Outlet />
 const Layout = () => {
   return (
