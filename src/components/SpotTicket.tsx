@@ -370,7 +370,7 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
 
       {/* Quote */}
       <div className="space-y-2 text-sm">
-        <Row label="You receive" value={quoteDisplay} accent />
+        <Row label="You receive" value={quoteDisplay} />
         <Row
           label="Fee (0.3%)"
           value={

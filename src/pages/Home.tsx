@@ -42,11 +42,6 @@ const Home = () => {
       <section className="home-section container">
         {/* Hello - full width on small screens, 2 columns on large */}
         <div className="flex lg:flex-row flex-col items-center justify-center col-span-1 lg:col-span-3 gap-3">
-          <div className="text-[#FB4F1F]  text-3xl">
-            <span>
-              Buy <br /> Sell <br /> Earn
-            </span>
-          </div>
           <h1 className="text-8xl md:text-[8vw] leading-none text-center  text-white  font-inter ">
             Trade Stocks
           </h1>

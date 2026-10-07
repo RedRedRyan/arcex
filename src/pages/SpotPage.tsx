@@ -101,7 +101,7 @@ const SpotPage = () => {
 
         {/* ── Trading options ── */}
         <div
-          className="col-span-1 lg:col-span-1 min-h-0 overflow-y-auto rounded-2xl p-4 bg-[#fb4f1f]"
+          className="col-span-1 lg:col-span-1 min-h-0 overflow-y-auto rounded-2xl p-4 bg-gradient-to-br from-white/15 via-transparent to-transparent"
           style={{
             border: "1px solid var(--border)",
           }}
