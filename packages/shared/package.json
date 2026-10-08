@@ -1,0 +1,31 @@
+{
+  "name": "@arcex/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./chains": "./src/chains.ts",
+    "./units": "./src/units.ts",
+    "./addresses": "./src/addresses.ts",
+    "./abis": "./src/abis/index.ts",
+    "./schemas": "./src/schemas.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --fix src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "oxlint": "^1.80.0",
+    "typescript": "~7.0.2",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "viem": "^2.56.3",
+    "zod": "^3.23.8"
+  }
+}

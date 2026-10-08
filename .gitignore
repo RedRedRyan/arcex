@@ -1,0 +1,46 @@
+# ── Secrets — NEVER commit ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# ── Arc Studio debug artifacts — NEVER commit ────────────────────────────────
+console.jsonl
+traces.jsonl
+
+# ── JavaScript / Bun ─────────────────────────────────────────────────────────
+node_modules/
+.bun-version
+
+# ── TypeScript build outputs ─────────────────────────────────────────────────
+dist/
+build/
+.tsbuildinfo
+
+# ── Foundry ───────────────────────────────────────────────────────────────────
+contracts/cache/
+contracts/out/
+broadcast/
+# Keep: contracts/broadcast/<script>/*/run-latest.json is useful for address tracking
+# Exclude only large/generated output
+cache/
+
+# ── Vite / Rollup ─────────────────────────────────────────────────────────────
+.vite/
+
+# ── Test artifacts ─────────────────────────────────────────────────────────────
+coverage/
+lcov.info
+.nyc_output/
+
+# ── OS / editor ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log
+logs/

@@ -1,0 +1,32 @@
+[profile.default]
+src = "contracts"
+test = "contracts/test"
+script = "contracts/script"
+out = "contracts/out"
+libs = ["lib"]
+cache_path = "contracts/cache"
+solc_version = "0.8.28"
+auto_detect_solc = false
+evm_version = "paris"
+optimizer = true
+optimizer_runs = 200
+
+[rpc_endpoints]
+# Arc — primary deployment targets
+arc_mainnet = "${ARC_MAINNET_RPC}"
+arc_testnet = "${ARC_TESTNET_RPC}"
+
+# Other networks (for cross-chain scripts)
+ethereum     = "https://ethereum-rpc.publicnode.com"
+sepolia      = "https://ethereum-sepolia-rpc.publicnode.com"
+base         = "https://base-rpc.publicnode.com"
+base_sepolia = "https://base-sepolia-rpc.publicnode.com"
+arbitrum     = "https://arbitrum-one-rpc.publicnode.com"
+polygon      = "https://polygon-bor-rpc.publicnode.com"
+optimism     = "https://optimism-rpc.publicnode.com"
+
+[etherscan]
+# Arc Mainnet block explorer (Blockscout — no API key required)
+arc_mainnet = { key = "any", url = "https://explorer.arc.io/api" }
+# Arc Testnet block explorer (Blockscout — no API key required)
+arc_testnet = { key = "any", url = "https://explorer.testnet.arc.io/api" }

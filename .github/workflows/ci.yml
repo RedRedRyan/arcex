@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Lint + Typecheck (web + shared) ────────────────────────────────────────
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Lint (oxlint)
+        run: |
+          cd ${{ github.workspace }}
+          bunx oxlint --type-aware src scripts || true
+          bunx oxlint .
+
+      - name: Typecheck (web)
+        run: bun run typecheck
+
+      - name: Typecheck (shared)
+        working-directory: packages/shared
+        run: bun run typecheck
+
+  # ── Vitest (packages/shared) ────────────────────────────────────────────────
+  vitest:
+    name: Unit Tests (Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run Vitest
+        working-directory: packages/shared
+        run: bun run test
+
+  # ── Foundry (contracts) ─────────────────────────────────────────────────────
+  foundry:
+    name: Foundry Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install Bun (for remappings via node_modules)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install node_modules
+        run: bun install
+
+      - name: Forge build
+        run: forge build
+
+      - name: Forge test (unit + fuzz)
+        run: forge test -vvv --fuzz-runs 1000
+
+      - name: Forge test (invariant)
+        run: forge test -vvv --match-test invariant
+
+  # ── Build check (Vite) ──────────────────────────────────────────────────────
+  build:
+    name: Vite Build
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Vite build
+        run: bun run build
+        env:
+          # Stub addresses for build-time validation
+          VITE_SPOT_POOL_ADDRESS: "0x0000000000000000000000000000000000000001"
+          VITE_PERP_ENGINE_ADDRESS: "0x0000000000000000000000000000000000000002"
+          VITE_PRICE_ORACLE_ADDRESS: "0x0000000000000000000000000000000000000003"
+          VITE_MARKET_REGISTRY_ADDRESS: "0x0000000000000000000000000000000000000004"
+          VITE_TIMELOCK_ADDRESS: "0x0000000000000000000000000000000000000005"
