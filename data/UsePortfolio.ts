@@ -18,7 +18,7 @@ import {
   CONTRACT_ADDRESSES,
   PAIRS,
 } from "../src/constants";
-import PerpEngineArtifact from "../contracts/out/PerpEngine.sol/PerpEngine.json";
+import PerpEngineArtifact from "../contracts/contract-metadata/PerpEngine.json";
 import { usePoolFeed, type Candle } from "../data/OracleFeed";
 import { useWalletBalances } from "./MarketStore";
 
