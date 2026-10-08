@@ -2,7 +2,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadCont
 import { ExternalLink, X } from "lucide-react";
 import { CONTRACT_ADDRESSES, PAIRS, ARC_TESTNET_CHAIN_ID } from "../constants";
 import { formatUsdc, formatPrice, getExplorerTxUrl } from "../utils";
-import PerpEngineArtifact from "../../contracts/out/PerpEngine.sol/PerpEngine.json";
+import PerpEngineArtifact from "../../contracts/contract-metadata/PerpEngine.json";
 import { PairId } from "../types";
 
 interface PositionRowData {

@@ -6,8 +6,8 @@ import { ExternalLink } from "lucide-react";
 import { ARC_TESTNET_CHAIN_ID, ARC_USDC_ADDRESS, CONTRACT_ADDRESSES, PAIRS, MAX_LEVERAGE } from "../constants";
 import { TradingMode, PairId } from "../types";
 import { parseUsdc, formatUsdc, calcLiqPrice, getExplorerTxUrl } from "../utils";
-import PerpEngineArtifact from "../../contracts/out/PerpEngine.sol/PerpEngine.json";
-import SpotPoolArtifact from "../../contracts/out/SpotPoolFactory.sol/SpotPoolFactory.json";
+import PerpEngineArtifact from "../../contracts/contract-metadata/PerpEngine.json";
+import SpotPoolArtifact from "../../contracts/contract-metadata/SpotPoolFactory.json";
 import { useWalletBalances } from "../../data/MarketStore";
 import { formatPrice, usePoolFeed } from "../../data/OracleFeed";
 

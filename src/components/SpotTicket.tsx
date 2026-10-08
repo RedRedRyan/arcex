@@ -20,7 +20,7 @@ import { PairId } from "../types";
 import { parseUsdc, formatUsdc, getExplorerTxUrl } from "../utils";
 import { useMarketPair, useWalletBalances } from "../../data/MarketStore";
 import { formatPrice } from "../../data/OracleFeed";
-import SpotPoolArtifact from "../../contracts/out/SpotPoolFactory.sol/SpotPoolFactory.json";
+import SpotPoolArtifact from "../../contracts/contract-metadata/SpotPoolFactory.json";
 
 interface SpotTicketProps {
   pairId: PairId;

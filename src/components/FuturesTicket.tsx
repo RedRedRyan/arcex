@@ -6,7 +6,7 @@ import { ExternalLink, TrendingUp, TrendingDown } from "lucide-react";
 import { ARC_TESTNET_CHAIN_ID, ARC_USDC_ADDRESS, CONTRACT_ADDRESSES, PAIRS, MAX_LEVERAGE } from "../constants";
 import { PairId } from "../types";
 import { parseUsdc, formatUsdc, calcLiqPrice, getExplorerTxUrl } from "../utils";
-import PerpEngineArtifact from "../../contracts/out/PerpEngine.sol/PerpEngine.json";
+import PerpEngineArtifact from "../../contracts/contract-metadata/PerpEngine.json";
 import { useWalletBalances } from "../../data/MarketStore";
 import { usePoolFeed } from "../../data/OracleFeed";
 
