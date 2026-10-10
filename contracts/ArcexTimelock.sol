@@ -40,12 +40,9 @@ contract ArcexTimelock is TimelockController {
      * @param admin_      Account that gets DEFAULT_ADMIN_ROLE. Pass address(0) to renounce
      *                    immediately (recommended for production so no EOA can bypass delay).
      */
-    constructor(
-        uint256 minDelay_,
-        address[] memory proposers_,
-        address[] memory executors_,
-        address admin_
-    ) TimelockController(minDelay_, proposers_, executors_, admin_) {
+    constructor(uint256 minDelay_, address[] memory proposers_, address[] memory executors_, address admin_)
+        TimelockController(minDelay_, proposers_, executors_, admin_)
+    {
         if (minDelay_ < MINIMUM_DELAY) revert DelayTooShort(minDelay_, MINIMUM_DELAY);
     }
 }

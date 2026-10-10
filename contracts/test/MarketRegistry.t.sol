@@ -13,11 +13,11 @@ contract MarketRegistryTest is Test {
 
     MarketRegistry public registry;
 
-    address internal admin  = address(0x3B2f9f644312cdB69be095FCC3b353C69a0088B2);
+    address internal admin = address(0x3B2f9f644312cdB69be095FCC3b353C69a0088B2);
     address internal pauser = address(0xBEEF);
-    address internal rando  = address(0xCAFE);
+    address internal rando = address(0xCAFE);
 
-    bytes32 internal ADMIN_ROLE  = keccak256("ADMIN_ROLE");
+    bytes32 internal ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 internal PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     function setUp() public {
@@ -201,7 +201,7 @@ contract MarketRegistryTest is Test {
 
 contract MarketRegistryInvariantTest is Test {
     MarketRegistry public registry;
-    address internal admin  = address(0x3B2f9f644312cdB69be095FCC3b353C69a0088B2);
+    address internal admin = address(0x3B2f9f644312cdB69be095FCC3b353C69a0088B2);
     address internal pauser = address(0xBEEF);
 
     function setUp() public {

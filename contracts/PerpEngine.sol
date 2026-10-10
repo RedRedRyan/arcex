@@ -166,7 +166,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         _applyFunding(pairId);
 
         uint256 markPrice = IPriceOracle(oracle).getMarkPrice(pairId);
-        int256 fundingPnl = (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
+        int256 fundingPnl =
+            (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
         int256 totalPnl = _calcPnl(pos, markPrice) + fundingPnl;
 
         uint256 closeFee = (pos.sizeUsdc * openCloseFeesBps) / 10000;
@@ -191,7 +192,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
 
         _applyFunding(pairId);
 
-        int256 fundingPnl = (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
+        int256 fundingPnl =
+            (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
         if (fundingPnl != 0) {
             pos.margin = uint256(int256(pos.margin) + fundingPnl);
         }
@@ -230,7 +232,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         _applyFunding(pairId);
 
         uint256 markPrice = IPriceOracle(oracle).getMarkPrice(pairId);
-        int256 fundingPnl = (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
+        int256 fundingPnl =
+            (int256(pos.sizeUsdc) * (fundingStates[pairId].fundingIndex - pos.fundingIndexSnapshot)) / 1e18;
         int256 totalPnl = _calcPnl(pos, markPrice) + fundingPnl;
         int256 effectiveMargin = int256(pos.margin) + totalPnl;
 

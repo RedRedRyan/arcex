@@ -14,10 +14,11 @@ import {
   BASE_TOKENS,
   CONTRACT_ADDRESSES,
 } from "../src/constants";
+import { supabase } from "../src/utils/supabase";
 
 const REFRESH_MS = 3_000;
-const CANDLE_SECONDS = 60;
-const MAX_CANDLES = 1_440;
+const CANDLE_SECONDS = 300;
+const MAX_CANDLES = 288;
 const POOL_ABI = parseAbi([
   "function pools(uint8 pairId) view returns (address baseToken, uint128 reserveUSDC, uint128 reserveBase, bool active)",
   "event LiquidityAdded(uint8 indexed pairId, address indexed provider, uint256 amountUSDC, uint256 amountBase, uint256 lpMinted)",
@@ -29,7 +30,7 @@ const TRANSFER_EVENT = parseAbiItem(
 );
 const PAIR_IDS = [0, 1, 2] as const;
 const TOKEN_ADDRESSES = [ARC_USDC_ADDRESS, ...PAIR_IDS.map((id) => BASE_TOKENS[id])] as Address[];
-const CACHE_PREFIX = "arcex-market-v1";
+const CACHE_PREFIX = "arcex-market-v2";
 const BALANCE_CACHE_PREFIX = "arcex-wallet-balances-v1";
 
 export interface MarketCandle {
@@ -84,6 +85,32 @@ interface PoolEvent {
   amountBase?: bigint;
   blockNumber: bigint;
   logIndex: number;
+}
+
+interface IndexedCandleRow {
+  pair_id: number;
+  open_time: string;
+  open: number | string;
+  high: number | string;
+  low: number | string;
+  close: number | string;
+  volume: number | string;
+}
+
+function isIndexedCandleRow(value: unknown): value is IndexedCandleRow {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  const isNumeric = (entry: unknown) =>
+    typeof entry === "number" || typeof entry === "string";
+  return (
+    typeof row.pair_id === "number" &&
+    typeof row.open_time === "string" &&
+    isNumeric(row.open) &&
+    isNumeric(row.high) &&
+    isNumeric(row.low) &&
+    isNumeric(row.close) &&
+    isNumeric(row.volume)
+  );
 }
 
 const primaryRpc =
@@ -193,6 +220,9 @@ class MarketStore {
   private refreshInFlight: Promise<void> | null = null;
   private refreshingAddress: string | null = null;
   private queuedWalletAddress: Address | null = null;
+  private indexedHistoryLoaded = false;
+  private indexedHistoryAttemptAt = 0;
+  private indexedHistoryRequest: Promise<void> | null = null;
 
   subscribePair = (pairId: number, listener: () => void) => {
     this.pairListeners[pairId]?.add(listener);
@@ -253,11 +283,109 @@ class MarketStore {
       document.addEventListener("visibilitychange", this.onVisibilityChange);
     if (typeof window !== "undefined")
       window.addEventListener("focus", this.onWindowFocus);
+    void this.loadIndexedHistory();
     void this.refresh(address);
     this.refreshTimer = setInterval(() => {
       if (typeof document === "undefined" || !document.hidden)
         void this.refresh();
     }, REFRESH_MS);
+  }
+
+  private loadIndexedHistory(): Promise<void> {
+    if (!supabase || this.indexedHistoryLoaded) return Promise.resolve();
+    if (this.indexedHistoryRequest) return this.indexedHistoryRequest;
+    if (Date.now() - this.indexedHistoryAttemptAt < 60_000)
+      return Promise.resolve();
+    this.indexedHistoryAttemptAt = Date.now();
+
+    const request = (async () => {
+      const since = new Date(Date.now() - 86_400_000).toISOString();
+      const { data, error } = await supabase
+        .from("market_candles")
+        .select(
+          "pair_id,open_time,open,high,low,close,volume",
+        )
+        .eq("chain_id", arcTestnet.id)
+        .eq("timeframe_seconds", CANDLE_SECONDS)
+        .in("pair_id", [...PAIR_IDS])
+        .gte("open_time", since)
+        .order("open_time", { ascending: true })
+        .limit(900);
+      if (error) throw new Error(`Could not load indexed candles: ${error.message}`);
+
+      const byPair = PAIR_IDS.map(() => [] as (MarketCandle & { volume: number })[]);
+      const rows: unknown[] = data;
+      for (const candidate of rows) {
+        if (!isIndexedCandleRow(candidate)) {
+          console.warn("Skipping malformed indexed candle row.");
+          continue;
+        }
+        const row = candidate;
+        const pairId = Number(row.pair_id);
+        const time = Math.floor(Date.parse(row.open_time) / 1_000);
+        const values = [row.open, row.high, row.low, row.close, row.volume].map(
+          Number,
+        );
+        if (
+          (pairId !== 0 && pairId !== 1 && pairId !== 2) ||
+          !Number.isFinite(time) ||
+          values.some((value) => !Number.isFinite(value))
+        )
+          continue;
+        const [open, high, low, close, volume] = values;
+        byPair[pairId].push({ time, open, high, low, close, volume });
+      }
+
+      for (const pairId of PAIR_IDS) {
+        const snapshot = this.pairSnapshots[pairId];
+        const candlesByTime = new Map(
+          byPair[pairId].map((candle) => [candle.time, candle]),
+        );
+        for (const cached of snapshot.candles) {
+          const indexed = candlesByTime.get(cached.time);
+          candlesByTime.set(
+            cached.time,
+            indexed
+              ? {
+                  ...indexed,
+                  high: Math.max(indexed.high, cached.high),
+                  low: Math.min(indexed.low, cached.low),
+                  close: cached.close,
+                }
+              : { ...cached, volume: 0 },
+          );
+        }
+        const merged = [...candlesByTime.values()].sort(
+          (a, b) => a.time - b.time,
+        );
+        if (merged.length === 0) continue;
+        const candles = merged.slice(-MAX_CANDLES);
+        const volume24h = byPair[pairId].reduce(
+          (sum, candle) => sum + candle.volume,
+          0,
+        );
+        this.pairSnapshots[pairId] = {
+          ...snapshot,
+          candles,
+          last: candles[candles.length - 1],
+          price: snapshot.price ?? candles[candles.length - 1].close,
+          volume24h,
+          epoch: snapshot.epoch + 1,
+          ...summarizeCandles(candles),
+        };
+        if (snapshot.price !== null)
+          this.pushPrice(pairId, snapshot.price, Math.floor(Date.now() / 1_000));
+        this.persistPair(pairId);
+        this.emitPair(pairId);
+      }
+      this.indexedHistoryLoaded = data.length > 0;
+    })().catch((error: unknown) => {
+      console.warn("Indexed candles are unavailable; keeping cached/live data.", error);
+    }).finally(() => {
+      this.indexedHistoryRequest = null;
+    });
+    this.indexedHistoryRequest = request;
+    return request;
   }
 
   private stopIfIdle() {
@@ -345,6 +473,7 @@ class MarketStore {
   }
 
   private async refreshAll(address?: Address) {
+    void this.loadIndexedHistory();
     try {
       const contracts = [
         ...PAIR_IDS.map((pairId) => ({

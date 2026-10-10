@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {MarketRegistry}  from "../MarketRegistry.sol";
-import {ArcexTimelock}   from "../ArcexTimelock.sol";
+import {MarketRegistry} from "../MarketRegistry.sol";
+import {ArcexTimelock} from "../ArcexTimelock.sol";
 
 /**
  * @title  DeployMainnet — Phase 0 (Arc Mainnet)
@@ -39,27 +39,20 @@ contract DeployMainnet is Script {
         // ── Safety gate 1: explicit mainnet confirmation ──────────────────────
         string memory confirm = vm.envOr("MAINNET_CONFIRM", string(""));
         require(
-            keccak256(bytes(confirm)) == keccak256(bytes("yes")),
-            "DeployMainnet: set MAINNET_CONFIRM=yes to proceed"
+            keccak256(bytes(confirm)) == keccak256(bytes("yes")), "DeployMainnet: set MAINNET_CONFIRM=yes to proceed"
         );
 
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
-        address admin       = vm.envAddress("ADMIN_ADDRESS");
+        address deployer = vm.addr(deployerKey);
+        address admin = vm.envAddress("ADMIN_ADDRESS");
         uint256 timelockDelay = vm.envUint("TIMELOCK_DELAY_SECONDS");
 
         // ── Safety gate 2: admin must not be the deployer EOA ─────────────────
         require(admin != address(0), "DeployMainnet: ADMIN_ADDRESS must be set");
-        require(
-            admin != deployer,
-            "DeployMainnet: ADMIN_ADDRESS must differ from deployer (use multisig)"
-        );
+        require(admin != deployer, "DeployMainnet: ADMIN_ADDRESS must differ from deployer (use multisig)");
 
         // ── Safety gate 3: minimum 24h delay on mainnet ───────────────────────
-        require(
-            timelockDelay >= MAINNET_MINIMUM_DELAY,
-            "DeployMainnet: TIMELOCK_DELAY_SECONDS must be >= 86400 (24h)"
-        );
+        require(timelockDelay >= MAINNET_MINIMUM_DELAY, "DeployMainnet: TIMELOCK_DELAY_SECONDS must be >= 86400 (24h)");
 
         console2.log("=== arcex Phase 0 MAINNET Deploy ===");
         console2.log("Deployer :", deployer);
@@ -79,7 +72,7 @@ contract DeployMainnet is Script {
             timelockDelay,
             proposers,
             executors,
-            address(0)  // renounce DEFAULT_ADMIN_ROLE immediately
+            address(0) // renounce DEFAULT_ADMIN_ROLE immediately
         );
         console2.log("ArcexTimelock :", address(timelock));
 

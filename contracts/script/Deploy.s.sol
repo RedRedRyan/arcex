@@ -37,9 +37,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///     -vvvv
 contract Deploy is Script {
     // ── Oracle seed prices (8 decimals, matching PriceOracle constructor) ──
-    uint256 constant TECHX_PRICE   = 150_00000000; // $150.00
-    uint256 constant ENERGYX_PRICE =  75_00000000; // $75.00
-    uint256 constant ARCX_PRICE    =  25_00000000; // $25.00
+    uint256 constant TECHX_PRICE = 150_00000000; // $150.00
+    uint256 constant ENERGYX_PRICE = 75_00000000; // $75.00
+    uint256 constant ARCX_PRICE = 25_00000000; // $25.00
 
     // ── MockERC20 decimals ────────────────────────────────────────────────
     uint8 constant TOKEN_DECIMALS = 18;
@@ -47,9 +47,9 @@ contract Deploy is Script {
     function run() external {
         // Load deployer key from env — never hard-code
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
-        address usdc        = vm.envAddress("USDC_ADDRESS");
-        bool skipSeed       = vm.envOr("SKIP_SEED", false);
+        address deployer = vm.addr(deployerKey);
+        address usdc = vm.envAddress("USDC_ADDRESS");
+        bool skipSeed = vm.envOr("SKIP_SEED", false);
 
         console2.log("=== stockX Pro Deployment ===");
         console2.log("Deployer :", deployer);
@@ -72,9 +72,9 @@ contract Deploy is Script {
         console2.log("PerpEngine           :", address(perp));
 
         // ── 4. MockERC20 base tokens ──────────────────────────────────────
-        MockERC20 techx   = new MockERC20("TechX Index",    "TECHx",   TOKEN_DECIMALS, deployer);
-        MockERC20 energyx = new MockERC20("Energy Index",   "ENERGYx", TOKEN_DECIMALS, deployer);
-        MockERC20 arcx    = new MockERC20("Arc Token",      "ARCx",    TOKEN_DECIMALS, deployer);
+        MockERC20 techx = new MockERC20("TechX Index", "TECHx", TOKEN_DECIMALS, deployer);
+        MockERC20 energyx = new MockERC20("Energy Index", "ENERGYx", TOKEN_DECIMALS, deployer);
+        MockERC20 arcx = new MockERC20("Arc Token", "ARCx", TOKEN_DECIMALS, deployer);
 
         console2.log("TECHx  (MockERC20)   :", address(techx));
         console2.log("ENERGYx (MockERC20)  :", address(energyx));
@@ -120,36 +120,36 @@ contract Deploy is Script {
         MockERC20 energyx,
         MockERC20 arcx
     ) internal {
-        uint256 usdcTechx   = vm.envOr("SEED_USDC_TECHX",   uint256(15_000_000_000)); // 15 000 USDC
-        uint256 usdcEnergyx = vm.envOr("SEED_USDC_ENERGYX", uint256(7_500_000_000));  //  7 500 USDC
-        uint256 usdcArcx    = vm.envOr("SEED_USDC_ARCX",    uint256(2_500_000_000));  //  2 500 USDC
+        uint256 usdcTechx = vm.envOr("SEED_USDC_TECHX", uint256(15_000_000_000)); // 15 000 USDC
+        uint256 usdcEnergyx = vm.envOr("SEED_USDC_ENERGYX", uint256(7_500_000_000)); //  7 500 USDC
+        uint256 usdcArcx = vm.envOr("SEED_USDC_ARCX", uint256(2_500_000_000)); //  2 500 USDC
 
         // Base amounts derived from oracle price ratios (price has 8 decimals, tokens 18)
         // baseLot = usdcAmt * 1e(18-6) / (price / 1e8) = usdcAmt * 1e20 / price
-        uint256 baseTechx   = (usdcTechx   * 1e20) / TECHX_PRICE;   // 100 TECHx
+        uint256 baseTechx = (usdcTechx * 1e20) / TECHX_PRICE; // 100 TECHx
         uint256 baseEnergyx = (usdcEnergyx * 1e20) / ENERGYX_PRICE; // 100 ENERGYx
-        uint256 baseArcx    = (usdcArcx    * 1e20) / ARCX_PRICE;    // 100 ARCx
+        uint256 baseArcx = (usdcArcx * 1e20) / ARCX_PRICE; // 100 ARCx
 
         // Mint base tokens to deployer
-        techx.mint(deployer,   baseTechx);
+        techx.mint(deployer, baseTechx);
         energyx.mint(deployer, baseEnergyx);
-        arcx.mint(deployer,    baseArcx);
+        arcx.mint(deployer, baseArcx);
 
         // Approve SpotPoolFactory for both USDC and base tokens
         uint256 totalUsdc = usdcTechx + usdcEnergyx + usdcArcx;
         IERC20(usdc).approve(address(spotPool), totalUsdc);
-        techx.approve(address(spotPool),   baseTechx);
+        techx.approve(address(spotPool), baseTechx);
         energyx.approve(address(spotPool), baseEnergyx);
-        arcx.approve(address(spotPool),    baseArcx);
+        arcx.approve(address(spotPool), baseArcx);
 
         // Add liquidity — minLpOut = 0 for initial seed (no existing LP to compare against)
-        spotPool.addLiquidity(0, usdcTechx,   baseTechx,   0);
+        spotPool.addLiquidity(0, usdcTechx, baseTechx, 0);
         spotPool.addLiquidity(1, usdcEnergyx, baseEnergyx, 0);
-        spotPool.addLiquidity(2, usdcArcx,    baseArcx,    0);
+        spotPool.addLiquidity(2, usdcArcx, baseArcx, 0);
 
         console2.log("Pools seeded:");
-        console2.log("  TECHx pool  : USDC=%s, TECHx=%s",   usdcTechx,   baseTechx);
+        console2.log("  TECHx pool  : USDC=%s, TECHx=%s", usdcTechx, baseTechx);
         console2.log("  ENERGYx pool: USDC=%s, ENERGYx=%s", usdcEnergyx, baseEnergyx);
-        console2.log("  ARCx pool   : USDC=%s, ARCx=%s",    usdcArcx,    baseArcx);
+        console2.log("  ARCx pool   : USDC=%s, ARCx=%s", usdcArcx, baseArcx);
     }
 }

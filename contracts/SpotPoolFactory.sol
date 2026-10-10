@@ -33,18 +33,10 @@ contract SpotPoolFactory is Ownable, ReentrancyGuard {
     error ZeroAmount();
 
     event LiquidityAdded(
-        uint8 indexed pairId,
-        address indexed provider,
-        uint256 amountUSDC,
-        uint256 amountBase,
-        uint256 lpMinted
+        uint8 indexed pairId, address indexed provider, uint256 amountUSDC, uint256 amountBase, uint256 lpMinted
     );
     event LiquidityRemoved(
-        uint8 indexed pairId,
-        address indexed provider,
-        uint256 amountUSDC,
-        uint256 amountBase,
-        uint256 lpBurned
+        uint8 indexed pairId, address indexed provider, uint256 amountUSDC, uint256 amountBase, uint256 lpBurned
     );
     event Swap(
         uint8 indexed pairId,
@@ -53,6 +45,16 @@ contract SpotPoolFactory is Ownable, ReentrancyGuard {
         uint256 amountIn,
         uint256 amountOut,
         address indexed to
+    );
+    event SwapReservesUpdated(
+        uint8 indexed pairId,
+        address indexed sender,
+        bool usdcIn,
+        uint256 amountIn,
+        uint256 amountOut,
+        address indexed to,
+        uint128 postTradeReserveUSDC,
+        uint128 postTradeReserveBase
     );
     event PoolActivated(uint8 indexed pairId, address baseToken);
 
@@ -77,7 +79,10 @@ contract SpotPoolFactory is Ownable, ReentrancyGuard {
         emit PoolActivated(pairId, baseToken);
     }
 
-    function addLiquidity(uint8 pairId, uint256 amountUSDC, uint256 amountBase, uint256 minLpOut) external nonReentrant {
+    function addLiquidity(uint8 pairId, uint256 amountUSDC, uint256 amountBase, uint256 minLpOut)
+        external
+        nonReentrant
+    {
         if (amountUSDC == 0 || amountBase == 0) revert ZeroAmount();
 
         Pool storage pool = _activePool(pairId);
@@ -111,12 +116,7 @@ contract SpotPoolFactory is Ownable, ReentrancyGuard {
         emit LiquidityAdded(pairId, msg.sender, amountUSDC, amountBase, lpMinted);
     }
 
-    function removeLiquidity(
-        uint8 pairId,
-        uint256 lpAmount,
-        uint256 minUSDC,
-        uint256 minBase
-    ) external nonReentrant {
+    function removeLiquidity(uint8 pairId, uint256 lpAmount, uint256 minUSDC, uint256 minBase) external nonReentrant {
         if (lpAmount == 0) revert ZeroAmount();
 
         Pool storage pool = _activePool(pairId);
@@ -167,6 +167,16 @@ contract SpotPoolFactory is Ownable, ReentrancyGuard {
         IERC20(pool.baseToken).safeTransfer(to, amountOut);
 
         emit Swap(pairId, msg.sender, true, amountUSDCIn, amountOut, to);
+        emit SwapReservesUpdated(
+            pairId,
+            msg.sender,
+            true,
+            amountUSDCIn,
+            amountOut,
+            to,
+            pool.reserveUSDC,
+            pool.reserveBase
+        );
     }
 
     function swapBaseForUSDC(uint8 pairId, uint256 amountBaseIn, uint256 minUSDCOut, address to) external nonReentrant {

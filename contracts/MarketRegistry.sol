@@ -24,7 +24,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 contract MarketRegistry is AccessControl {
     // ── Roles ────────────────────────────────────────────────────────────────
 
-    bytes32 public constant ADMIN_ROLE  = keccak256("ADMIN_ROLE");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     // ── Market parameters ─────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ contract MarketRegistry is AccessControl {
         /// @notice Entry fee in basis points (e.g. 10 = 0.10%). Hard-capped at 10%.
         uint256 entryFeeBps;
         /// @notice Maximum leverage allowed for new positions.
-        uint8   maxLeverage;
+        uint8 maxLeverage;
         /// @notice Maximum aggregate open interest in ERC-20 USDC units (6 dec).
         uint256 oiCap;
         /// @notice Minimum price increment (oracle 8-dec units).
@@ -50,7 +50,7 @@ contract MarketRegistry is AccessControl {
         /// @notice Minimum order size in base token units (18 dec).
         uint256 lotSize;
         /// @notice Whether this specific market is paused.
-        bool    paused;
+        bool paused;
     }
 
     mapping(uint8 => MarketConfig) private _configs;
@@ -73,12 +73,7 @@ contract MarketRegistry is AccessControl {
     // ── Events ────────────────────────────────────────────────────────────────
 
     /// @notice Emitted whenever a market's configuration is updated.
-    event MarketConfigUpdated(
-        uint8   indexed pairId,
-        uint256 entryFeeBps,
-        uint8   maxLeverage,
-        uint256 oiCap
-    );
+    event MarketConfigUpdated(uint8 indexed pairId, uint256 entryFeeBps, uint8 maxLeverage, uint256 oiCap);
 
     /// @notice Emitted whenever a per-market pause flag changes.
     event MarketPauseToggled(uint8 indexed pairId, bool paused);
@@ -102,11 +97,11 @@ contract MarketRegistry is AccessControl {
      *   lotSize      = 1e15               (0.001 base token)
      */
     constructor(address admin_, address pauser_) {
-        require(admin_  != address(0), "MarketRegistry: admin is zero");
+        require(admin_ != address(0), "MarketRegistry: admin is zero");
         require(pauser_ != address(0), "MarketRegistry: pauser is zero");
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
-        _grantRole(ADMIN_ROLE,  admin_);
+        _grantRole(ADMIN_ROLE, admin_);
         _grantRole(PAUSER_ROLE, pauser_);
 
         // Seed default config for pairs 0, 1, 2
@@ -114,10 +109,10 @@ contract MarketRegistry is AccessControl {
             _configs[i] = MarketConfig({
                 entryFeeBps: 10,
                 maxLeverage: 5,
-                oiCap:       5_000_000_000_000,
-                tickSize:    1_000_000,
-                lotSize:     1e15,
-                paused:      false
+                oiCap: 5_000_000_000_000,
+                tickSize: 1_000_000,
+                lotSize: 1e15,
+                paused: false
             });
         }
     }
@@ -130,9 +125,9 @@ contract MarketRegistry is AccessControl {
      *         so every call carries the Timelock's mandatory delay.
      */
     function setMarketConfig(
-        uint8   pairId,
+        uint8 pairId,
         uint256 entryFeeBps,
-        uint8   maxLeverage,
+        uint8 maxLeverage,
         uint256 oiCap,
         uint256 tickSize,
         uint256 lotSize
@@ -140,16 +135,16 @@ contract MarketRegistry is AccessControl {
         _assertValidPair(pairId);
         if (entryFeeBps > ENTRY_FEE_BPS_CAP) revert InvalidFeeBps(entryFeeBps);
         if (maxLeverage == 0 || maxLeverage > MAX_LEVERAGE_CAP) revert InvalidLeverage(maxLeverage);
-        if (oiCap    == 0) revert ZeroOiCap();
+        if (oiCap == 0) revert ZeroOiCap();
         if (tickSize == 0) revert ZeroTickSize();
-        if (lotSize  == 0) revert ZeroLotSize();
+        if (lotSize == 0) revert ZeroLotSize();
 
         MarketConfig storage cfg = _configs[pairId];
         cfg.entryFeeBps = entryFeeBps;
         cfg.maxLeverage = maxLeverage;
-        cfg.oiCap       = oiCap;
-        cfg.tickSize    = tickSize;
-        cfg.lotSize     = lotSize;
+        cfg.oiCap = oiCap;
+        cfg.tickSize = tickSize;
+        cfg.lotSize = lotSize;
 
         emit MarketConfigUpdated(pairId, entryFeeBps, maxLeverage, oiCap);
     }
@@ -191,14 +186,7 @@ contract MarketRegistry is AccessControl {
     function getMarketParams(uint8 pairId)
         external
         view
-        returns (
-            uint256 entryFeeBps,
-            uint8   maxLeverage,
-            uint256 oiCap,
-            uint256 tickSize,
-            uint256 lotSize,
-            bool    paused
-        )
+        returns (uint256 entryFeeBps, uint8 maxLeverage, uint256 oiCap, uint256 tickSize, uint256 lotSize, bool paused)
     {
         _assertValidPair(pairId);
         MarketConfig storage cfg = _configs[pairId];

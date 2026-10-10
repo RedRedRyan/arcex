@@ -13,6 +13,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "indexer": "bun run --cwd services/indexer start",
+    "indexer:dev": "bun run --cwd services/indexer dev",
     "deploy:self": "tsx ./scripts/self-deploy.ts",
     "compass:deploy": "tsx ./scripts/compass-deploy.ts",
     "fetch:abi": "tsx ./scripts/fetch-abi.ts",
@@ -40,6 +42,7 @@
     "@dynamic-labs/wagmi-connector": "^5.9.6",
     "@gsap/react": "^2.1.2",
     "@openzeppelin/contracts": "5.1.0",
+    "@supabase/supabase-js": "^2.117.3",
     "@tanstack/react-query": "^5.62.7",
     "@vercel/analytics": "^2.0.1",
     "@web3icons/react": "^4.0.0",

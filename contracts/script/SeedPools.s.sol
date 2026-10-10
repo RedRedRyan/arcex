@@ -26,51 +26,51 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   forge script contracts/script/SeedPools.s.sol \
 ///     --rpc-url arc_testnet --broadcast --slow -vvvv
 contract SeedPools is Script {
-    uint256 constant TECHX_PRICE   = 150_00000000;
-    uint256 constant ENERGYX_PRICE =  75_00000000;
-    uint256 constant ARCX_PRICE    =  25_00000000;
+    uint256 constant TECHX_PRICE = 150_00000000;
+    uint256 constant ENERGYX_PRICE = 75_00000000;
+    uint256 constant ARCX_PRICE = 25_00000000;
 
     function run() external {
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
+        address deployer = vm.addr(deployerKey);
 
         SpotPoolFactory spotPool = SpotPoolFactory(vm.envAddress("SPOT_POOL_ADDRESS"));
-        MockERC20 techx          = MockERC20(vm.envAddress("TECHX_ADDRESS"));
-        MockERC20 energyx        = MockERC20(vm.envAddress("ENERGYX_ADDRESS"));
-        MockERC20 arcx           = MockERC20(vm.envAddress("ARCX_ADDRESS"));
-        address usdc             = vm.envAddress("USDC_ADDRESS");
+        MockERC20 techx = MockERC20(vm.envAddress("TECHX_ADDRESS"));
+        MockERC20 energyx = MockERC20(vm.envAddress("ENERGYX_ADDRESS"));
+        MockERC20 arcx = MockERC20(vm.envAddress("ARCX_ADDRESS"));
+        address usdc = vm.envAddress("USDC_ADDRESS");
 
-        uint256 usdcTechx   = vm.envOr("SEED_USDC_TECHX",   uint256(150_000_000));
+        uint256 usdcTechx = vm.envOr("SEED_USDC_TECHX", uint256(150_000_000));
         uint256 usdcEnergyx = vm.envOr("SEED_USDC_ENERGYX", uint256(75_000_000));
-        uint256 usdcArcx    = vm.envOr("SEED_USDC_ARCX",    uint256(25_000_000));
+        uint256 usdcArcx = vm.envOr("SEED_USDC_ARCX", uint256(25_000_000));
 
-        uint256 baseTechx   = (usdcTechx   * 1e20) / TECHX_PRICE;
+        uint256 baseTechx = (usdcTechx * 1e20) / TECHX_PRICE;
         uint256 baseEnergyx = (usdcEnergyx * 1e20) / ENERGYX_PRICE;
-        uint256 baseArcx    = (usdcArcx    * 1e20) / ARCX_PRICE;
+        uint256 baseArcx = (usdcArcx * 1e20) / ARCX_PRICE;
 
         console2.log("Seeding pools from:", deployer);
         console2.log("SpotPoolFactory    :", address(spotPool));
 
         vm.startBroadcast(deployerKey);
 
-        techx.mint(deployer,   baseTechx);
+        techx.mint(deployer, baseTechx);
         energyx.mint(deployer, baseEnergyx);
-        arcx.mint(deployer,    baseArcx);
+        arcx.mint(deployer, baseArcx);
 
         IERC20(usdc).approve(address(spotPool), usdcTechx + usdcEnergyx + usdcArcx);
-        techx.approve(address(spotPool),   baseTechx);
+        techx.approve(address(spotPool), baseTechx);
         energyx.approve(address(spotPool), baseEnergyx);
-        arcx.approve(address(spotPool),    baseArcx);
+        arcx.approve(address(spotPool), baseArcx);
 
-        spotPool.addLiquidity(0, usdcTechx,   baseTechx,   0);
+        spotPool.addLiquidity(0, usdcTechx, baseTechx, 0);
         spotPool.addLiquidity(1, usdcEnergyx, baseEnergyx, 0);
-        spotPool.addLiquidity(2, usdcArcx,    baseArcx,    0);
+        spotPool.addLiquidity(2, usdcArcx, baseArcx, 0);
 
         vm.stopBroadcast();
 
         console2.log("Done. Pools seeded:");
-        console2.log("  TECHx  : %s USDC, %s TECHx",   usdcTechx,   baseTechx);
+        console2.log("  TECHx  : %s USDC, %s TECHx", usdcTechx, baseTechx);
         console2.log("  ENERGYx: %s USDC, %s ENERGYx", usdcEnergyx, baseEnergyx);
-        console2.log("  ARCx   : %s USDC, %s ARCx",    usdcArcx,    baseArcx);
+        console2.log("  ARCx   : %s USDC, %s ARCx", usdcArcx, baseArcx);
     }
 }

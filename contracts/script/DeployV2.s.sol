@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {MarketRegistry}  from "../MarketRegistry.sol";
-import {ArcexTimelock}   from "../ArcexTimelock.sol";
+import {MarketRegistry} from "../MarketRegistry.sol";
+import {ArcexTimelock} from "../ArcexTimelock.sol";
 
 /**
  * @title  DeployV2 — Phase 0 (Testnet)
@@ -25,8 +25,8 @@ import {ArcexTimelock}   from "../ArcexTimelock.sol";
 contract DeployV2 is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
-        address admin       = vm.envAddress("ADMIN_ADDRESS");
+        address deployer = vm.addr(deployerKey);
+        address admin = vm.envAddress("ADMIN_ADDRESS");
         uint256 timelockDelay = vm.envOr("TIMELOCK_DELAY_SECONDS", uint256(86400)); // 24h default
 
         require(admin != address(0), "DeployV2: ADMIN_ADDRESS must be set");
@@ -53,7 +53,7 @@ contract DeployV2 is Script {
             timelockDelay,
             proposers,
             executors,
-            address(0)  // renounce admin role immediately
+            address(0) // renounce admin role immediately
         );
         console2.log("ArcexTimelock :", address(timelock));
 

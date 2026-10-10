@@ -20,11 +20,11 @@ import {PriceOracle} from "../PriceOracle.sol";
 contract UpdatePrices is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
-        PriceOracle oracle  = PriceOracle(vm.envAddress("PRICE_ORACLE_ADDRESS"));
+        PriceOracle oracle = PriceOracle(vm.envAddress("PRICE_ORACLE_ADDRESS"));
 
-        uint256 priceTechx   = vm.envUint("PRICE_TECHX");
+        uint256 priceTechx = vm.envUint("PRICE_TECHX");
         uint256 priceEnergyx = vm.envUint("PRICE_ENERGYX");
-        uint256 priceArcx    = vm.envUint("PRICE_ARCX");
+        uint256 priceArcx = vm.envUint("PRICE_ARCX");
 
         console2.log("Updating oracle prices:");
         console2.log("  TECHx  :", priceTechx);
@@ -32,7 +32,9 @@ contract UpdatePrices is Script {
         console2.log("  ARCx   :", priceArcx);
 
         uint8[] memory ids = new uint8[](3);
-        ids[0] = 0; ids[1] = 1; ids[2] = 2;
+        ids[0] = 0;
+        ids[1] = 1;
+        ids[2] = 2;
 
         uint256[] memory prices = new uint256[](3);
         prices[0] = priceTechx;
