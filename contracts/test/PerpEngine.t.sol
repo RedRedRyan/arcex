@@ -92,10 +92,9 @@ contract PerpEngineTest is Test {
         uint256 amount = 100000000; // 100 USDC
         vm.startPrank(owner);
         usdc.mint(trader1, amount);
-        usdc.approve(address(engine), amount);
         vm.stopPrank();
         vm.startPrank(trader1);
-        engine.depositMargin(amount);
+        usdc.approve(address(engine), amount);
         vm.stopPrank();
 
         assertEq(marginOf(trader1), amount);
@@ -106,15 +105,16 @@ contract PerpEngineTest is Test {
         uint256 deposit = 100000000;
         vm.startPrank(owner);
         usdc.mint(trader1, deposit);
-        usdc.approve(address(engine), deposit);
         vm.stopPrank();
         vm.startPrank(trader1);
-        engine.depositMargin(deposit);
+        usdc.approve(address(engine), deposit);
         vm.stopPrank();
 
         uint256 longSize = 10000000;
-        vm.startPrank(trader1);
+        vm.startPrank(owner);
         oracle.setPrice(0, 10000000);
+        vm.stopPrank();
+        vm.startPrank(trader1);
         engine.openPosition(0, true, longSize, 10);
         vm.stopPrank();
 
@@ -154,10 +154,9 @@ contract PerpEngineTest is Test {
 
         vm.startPrank(owner);
         usdc.mint(trader1, sizeUsdc);
-        usdc.approve(address(engine), sizeUsdc);
         vm.stopPrank();
         vm.startPrank(trader1);
-        engine.depositMargin(sizeUsdc);
+        usdc.approve(address(engine), sizeUsdc);
         vm.stopPrank();
 
         oracle.setPrice(0, 10000000);
@@ -185,10 +184,9 @@ contract PerpEngineTest is Test {
     function test_openPosition_rejectsInsufficientMargin() public {
         vm.startPrank(owner);
         usdc.mint(trader1, 10000000);
-        usdc.approve(address(engine), 10000000);
         vm.stopPrank();
         vm.startPrank(trader1);
-        engine.depositMargin(10000000);
+        usdc.approve(address(engine), 10000000);
         oracle.setPrice(0, 10000000);
         vm.stopPrank();
 
@@ -201,16 +199,20 @@ contract PerpEngineTest is Test {
     }
 
     function test_openPosition_rejectsInvalidPair() public {
-        vm.startPrank(trader1);
+        vm.startPrank(owner);
         oracle.setPrice(0, 10000000);
+        vm.stopPrank();
+        vm.startPrank(trader1);
         vm.expectRevert(abi.encodeWithSelector(PerpEngine.InvalidPair.selector));
         engine.openPosition(3, true, 100000000, 10);
         vm.stopPrank();
     }
 
     function test_openPosition_rejectsInvalidLeverage() public {
-        vm.startPrank(trader1);
+        vm.startPrank(owner);
         oracle.setPrice(0, 10000000);
+        vm.stopPrank();
+        vm.startPrank(trader1);
         vm.expectRevert(abi.encodeWithSelector(PerpEngine.InvalidLeverage.selector));
         engine.openPosition(0, true, 100000000, 0);
         vm.stopPrank();
@@ -218,8 +220,10 @@ contract PerpEngineTest is Test {
 
     function test_openPosition_rejectsAlreadyOpen() public {
         uint256 sizeUsdc = 100000000;
-        vm.startPrank(trader1);
+        vm.startPrank(owner);
         oracle.setPrice(0, 10000000);
+        vm.stopPrank();
+        vm.startPrank(trader1);
         engine.openPosition(0, true, sizeUsdc, 10);
 
         vm.expectRevert(abi.encodeWithSelector(PerpEngine.PositionAlreadyOpen.selector));
@@ -349,6 +353,9 @@ contract PerpEngineTest is Test {
         engine.depositMargin(sizeUsdc);
         vm.stopPrank();
 
+        vm.startPrank(owner);
+        oracle.setPrice(0, 10000000);
+        vm.stopPrank();
         vm.startPrank(trader1);
         engine.openPosition(0, true, sizeUsdc, 10);
         vm.stopPrank();
@@ -374,6 +381,9 @@ contract PerpEngineTest is Test {
         engine.depositMargin(sizeUsdc);
         vm.stopPrank();
 
+        vm.startPrank(owner);
+        oracle.setPrice(0, 10000000);
+        vm.stopPrank();
         vm.startPrank(trader1);
         engine.openPosition(0, true, sizeUsdc, leverage);
         vm.stopPrank();
@@ -395,6 +405,9 @@ contract PerpEngineTest is Test {
         engine.depositMargin(sizeUsdc);
         vm.stopPrank();
 
+        vm.startPrank(owner);
+        oracle.setPrice(0, 10000000);
+        vm.stopPrank();
         vm.startPrank(trader1);
         engine.openPosition(0, false, sizeUsdc, leverage);
         vm.stopPrank();
@@ -421,6 +434,9 @@ contract PerpEngineTest is Test {
         engine.depositMargin(sizeUsdc);
         vm.stopPrank();
 
+        vm.startPrank(owner);
+        oracle.setPrice(0, 10000000);
+        vm.stopPrank();
         vm.startPrank(trader1);
         engine.openPosition(0, true, sizeUsdc, 10);
         vm.stopPrank();
