@@ -536,7 +536,7 @@ body {
   padding: 11px 13px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--surface-muted);
+  @apply bg-gradient-to-br from-white/15 via-transparent to-transparent;
 }
 .usdc-meta {
   display: flex;

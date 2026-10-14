@@ -256,6 +256,7 @@ export const NETWORKS: Record<NetworkName, NetworkConfig> = {
         chainId: arcTestnetChain.id,
         label: "Arc Testnet",
         explorerUrl: "https://testnet.arcscan.app",
+        tokenAddress: "0x3600000000000000000000000000000000000000",
       },
     ],
     assets: [],
