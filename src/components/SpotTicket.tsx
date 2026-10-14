@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   useAccount,
   useWriteContract,
@@ -10,20 +10,17 @@ import { erc20Abi } from "viem";
 import { toast } from "sonner";
 import { ExternalLink, Zap } from "lucide-react";
 import {
-  ARC_TESTNET_CHAIN_ID,
-  ARC_USDC_ADDRESS,
-  CONTRACT_ADDRESSES,
   PAIRS,
-  BASE_TOKENS,
 } from "../constants";
-import { PairId } from "../types";
 import { parseUsdc, formatUsdc, getExplorerTxUrl } from "../utils";
+import { useNetwork } from "../config/NetworkProvider";
 import { useMarketPair, useWalletBalances } from "../../data/MarketStore";
 import { formatPrice } from "../../data/OracleFeed";
-import SpotPoolArtifact from "../../contracts/contract-metadata/SpotPoolFactory.json";
+import SpotPoolArtifact from "../../contracts/contract-metadata/SpotPoolFactoryV2.json";
 
+/** pairId accepts any SpotPoolFactoryV2 pool id (0/1/2 seed pairs, plus ids from createPair). */
 interface SpotTicketProps {
-  pairId: PairId;
+  pairId: number;
 }
 
 export default function SpotTicket({ pairId }: SpotTicketProps) {
@@ -32,12 +29,16 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
 
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
+  const { config, isTestnet } = useNetwork();
+  const chainIdOfNetwork = config.chainId;
+  const isWrongChain = isConnected && chainId !== chainIdOfNetwork;
+  const spotPool = config.contracts.spotPool;
+  const usdc = config.usdcAddress;
   const walletBalances = useWalletBalances(
     isConnected ? address : undefined,
   );
-  const isWrongChain = isConnected && chainId !== ARC_TESTNET_CHAIN_ID;
-  const pair = PAIRS[pairId];
-  const baseToken = BASE_TOKENS[pairId];
+  const pair = PAIRS.find((p) => p.id === pairId) ?? { id: pairId, ticker: `PAIR `, name: `Pair `, quote: "USDC", color: "#fb4f1f", seedPrice: 0 };
+  const baseToken = config.pairs.find((p) => p.id === pairId)?.baseToken ?? usdc;
   const pool = useMarketPair(pairId);
 
   const usdcBalance = walletBalances?.usdc ?? 0;
@@ -45,18 +46,18 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
 
   const reserveUSDC = pool.reserveQuote ?? 0n;
   const reserveBase = pool.reserveBase ?? 0n;
-  const poolActive = reserveUSDC > 0n && reserveBase > 0n;
+  const poolActive = pool.active && reserveUSDC > 0n && reserveBase > 0n;
   const hasLiquidity = reserveUSDC > 0n && reserveBase > 0n;
 
   // Allowance for SpotPool
-  const spender = CONTRACT_ADDRESSES.spotPool;
-  const tokenToApprove = side === "buy" ? ARC_USDC_ADDRESS : baseToken;
+  const spender = spotPool;
+  const tokenToApprove = side === "buy" ? usdc : baseToken;
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: tokenToApprove,
     abi: erc20Abi,
     functionName: "allowance",
     args: address && spender ? [address, spender] : undefined,
-    chainId: ARC_TESTNET_CHAIN_ID,
+    chainId: chainIdOfNetwork,
     query: { enabled: isConnected && !!address && !!spender },
   });
 
@@ -70,7 +71,7 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
 
   // Quote: estimated output
   const { data: quoteOut } = useReadContract({
-    address: CONTRACT_ADDRESSES.spotPool,
+    address: spotPool,
     abi: SpotPoolArtifact.abi,
     functionName: "getAmountOut",
     args: [
@@ -78,10 +79,10 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       side === "buy",
       side === "buy" ? amountBigint : amountBaseIn,
     ],
-    chainId: ARC_TESTNET_CHAIN_ID,
+    chainId: chainIdOfNetwork,
     query: {
       enabled:
-        !!CONTRACT_ADDRESSES.spotPool &&
+        !!spotPool &&
         effectiveAmount > 0n &&
         poolActive &&
         hasLiquidity,
@@ -131,12 +132,12 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       abi: erc20Abi,
       functionName: "approve",
       args: [spender, effectiveAmount * 100n],
-      chainId: ARC_TESTNET_CHAIN_ID,
+      chainId: chainIdOfNetwork,
     });
-  }, [approve, tokenToApprove, spender, effectiveAmount, address]);
+  }, [approve, tokenToApprove, spender, effectiveAmount, address, chainIdOfNetwork]);
 
   const handleSwap = useCallback(() => {
-    if (!address || !CONTRACT_ADDRESSES.spotPool) {
+    if (!address || !spotPool) {
       toast.error("Contract not deployed");
       return;
     }
@@ -148,21 +149,32 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       toast.error("Pool has no liquidity yet");
       return;
     }
+    // Slippage floor from the live quote. The quote already reflects this
+    // swap's price impact, so we only need to guard against the price moving
+    // further between quote and execution — a small tolerance on top. A fixed
+    // 98% would wrongly reject normal swaps on thin pools whose impact is
+    // large. Requires a quote so we never swap with no floor.
+    if (!quoteOut) {
+      toast.error("Waiting for a fresh quote…");
+      return;
+    }
+    const quote = BigInt(quoteOut as bigint);
+    const minOut = quote - (quote * 50n) / 10_000n; // quote − 0.5%
     if (side === "buy") {
       doSwap({
-        address: CONTRACT_ADDRESSES.spotPool,
+        address: spotPool,
         abi: SpotPoolArtifact.abi,
         functionName: "swapUSDCForBase",
-        args: [pairId, amountBigint, 0n, address],
-        chainId: ARC_TESTNET_CHAIN_ID,
+        args: [pairId, amountBigint, minOut, address],
+        chainId: chainIdOfNetwork,
       });
     } else {
       doSwap({
-        address: CONTRACT_ADDRESSES.spotPool,
+        address: spotPool,
         abi: SpotPoolArtifact.abi,
         functionName: "swapBaseForUSDC",
-        args: [pairId, amountBaseIn, 0n, address],
-        chainId: ARC_TESTNET_CHAIN_ID,
+        args: [pairId, amountBaseIn, minOut, address],
+        chainId: chainIdOfNetwork,
       });
     }
   }, [
@@ -172,6 +184,9 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
     amountBigint,
     amountBaseIn,
     doSwap,
+    spotPool,
+    chainIdOfNetwork,
+    quoteOut,
     poolActive,
     hasLiquidity,
   ]);
@@ -185,9 +200,43 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       : `≈${(Number(quoteOut) / 1e6).toFixed(2)} USDC`
     : "—";
 
+  // Real fee + price impact, both derived from the on-chain quote vs the
+  // ideal spot-price output. The pool applies a 0.3% fee, so the quote is
+  // below the ideal; the gap is fee + slippage combined (price impact).
+  const feeImpact = useMemo(() => {
+    if (effectiveAmount <= 0n || !quoteOut) return null;
+    const inNum = Number(effectiveAmount);
+    const spotPrice = pool.price;
+    if (!spotPrice || spotPrice <= 0) return null;
+    // Ideal output at the spot price (no fee, no slippage), matching the
+    // quote's units: buy returns base (18 dec), sell returns USDC (6 dec).
+    const idealOut =
+      side === "buy"
+        ? (inNum / 1e6) / spotPrice // USDC in -> base out
+        : (inNum / 1e18) * spotPrice; // base in -> USDC out
+    const actualOut =
+      side === "buy" ? Number(quoteOut) / 1e18 : Number(quoteOut) / 1e6;
+    if (idealOut <= 0) return null;
+    const impactPct = ((idealOut - actualOut) / idealOut) * 100;
+    return { idealOut, actualOut, impactPct };
+  }, [effectiveAmount, quoteOut, side, pool.price]);
+
+  // Fee in USDC terms: 0.3% of the input's USDC value. On a sell the input is
+  // base tokens, so convert to USDC at the spot price.
+  const feeUsdc = useMemo(() => {
+    if (effectiveAmount <= 0n) return null;
+    const spotPrice = pool.price;
+    if (!spotPrice || spotPrice <= 0) return null;
+    const inputUsdc =
+      side === "buy"
+        ? Number(effectiveAmount) / 1e6
+        : (Number(effectiveAmount) / 1e18) * spotPrice;
+    return inputUsdc * 0.003;
+  }, [effectiveAmount, side, pool.price]);
+
   const getBtn = () => {
     if (!isConnected) return "Connect Wallet";
-    if (isWrongChain) return "Switch to Arc Testnet";
+    if (isWrongChain) return `Switch to ${config.label}`;
     if (!poolActive) return "Pool Not Active";
     if (!hasLiquidity) return "No Liquidity";
     if (isApproving || isApproveConfirming) return "Approving...";
@@ -200,7 +249,7 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
   const handleSubmit = () => {
     if (!isConnected) return;
     if (isWrongChain) {
-      switchChain({ chainId: ARC_TESTNET_CHAIN_ID });
+      switchChain({ chainId: chainIdOfNetwork });
       return;
     }
     if (!poolActive || !hasLiquidity) return;
@@ -211,10 +260,13 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
     handleSwap();
   };
 
+  const hasAmount =
+    isConnected && !isWrongChain && amount !== "" && parseFloat(amount) > 0;
   const btnDisabled =
     isLoading ||
     !poolActive ||
     !hasLiquidity ||
+    (hasAmount && !quoteOut) ||
     (isConnected && !isWrongChain && (!amount || parseFloat(amount) <= 0));
 
   return (
@@ -326,6 +378,7 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
             {side === "buy"
               ? `Balance: ${formatUsdc(BigInt(Math.round(usdcBalance * 1e6)))} USDC`
               : `Balance: ${baseBalance.toFixed(4)} ${pair.ticker}`}
+            {isConnected && isWrongChain ? ` (on ${config.label})` : ""}
           </span>
           <button
             onClick={() => {
@@ -354,12 +407,18 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
         <Row
           label="Fee (0.3%)"
           value={
-            amount ? `$${(parseFloat(amount || "0") * 0.003).toFixed(4)}` : "—"
+            feeUsdc !== null ? `$${feeUsdc.toFixed(4)}` : "—"
           }
         />
         <Row
           label="Price impact"
-          value={amount && parseFloat(amount) > 0 ? "<0.1%" : "—"}
+          value={
+            feeImpact
+              ? feeImpact.impactPct < 0.01
+                ? "<0.01%"
+                : `${feeImpact.impactPct.toFixed(2)}%`
+              : "—"
+          }
         />
       </div>
 
@@ -400,7 +459,9 @@ export default function SpotTicket({ pairId }: SpotTicketProps) {
       </button>
 
       <p className="text-center text-xs" style={{ color: "var(--subtle)" }}>
-        ⚠ Testnet — AMM pool seeded with mock tokens
+        {isTestnet
+          ? "⚠ Testnet — AMM pool seeded with mock tokens"
+          : `${config.label} — live AMM pool`}
       </p>
     </div>
   );

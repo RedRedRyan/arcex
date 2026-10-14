@@ -10,25 +10,36 @@ Bun workspace monorepo:
 - `services/matcher` — off-chain order book + settlement submitter (Phase 3)
 - `services/keeper`  — liquidation/funding/TWAP bots (Phase 4)
 
-## Deployed Contracts — Arc Testnet (chainId 5042002)
+## Deployed Contracts — Arc Mainnet (chainId 5042) — TRADING CHAIN
+
+The frontend trades here (default network). Addresses are the single source of truth in `src/config/addresses.ts`; the app reads them via `config/networks.ts` (VITE_ env var overrides the fallback). Deployed + pools seeded 2026-10-14.
+
+| Contract | Address | Notes |
+|---|---|---|
+| TokenFactory | `0x29f342baf8b5cce612e4f040d8e1f062a33c175f` | Permissionless ERC-20 creation, 1h per-creator cooldown; owner = admin multisig |
+| SpotPoolFactoryV2 | `0x155b7e616cbe9d5972388ec0cd018834ed0f0cdf` | Constant-product AMM, 0.3% fee; pairs 0/1/2 seeded + live |
+| MockERC20 — TECHx | `0x7ca6362c602ce7c2547da50d27ca809c95d69c2b` | pairId=0, 18 dec; seeded $150 (6 USDC / 40 TECHx) |
+| MockERC20 — ENERGYx | `0x7b2c092771cd62cc43728f506b860db35d861192` | pairId=1, 18 dec; seeded $75 (4 USDC / 53.33 ENERGYx) |
+| MockERC20 — ARCx | `0x6affa44ea4dfa689becdcc23e8d8179a967ac352` | pairId=2, 18 dec; seeded $25 (2 USDC / 80 ARCx) |
+| ArcexTimelock | PENDING Phase 0 deploy | 24h delay, proposer = admin multisig |
+| MarketRegistry | PENDING Phase 0 deploy | ADMIN_ROLE → Timelock, PAUSER_ROLE → admin multisig |
+
+Spot prices verified on-chain: TECHx $150, ENERGYx $75, ARCx $25. Deploy used `contracts/script/Deploy.s.sol` via `cast send` (forge's local sim reverts on Arc's blocklist precompile `0x1800...0001`; the real node handles it).
+
+## Deployed Contracts — Arc Testnet (chainId 5042002) — SECONDARY
+
+Legacy/older spot stack. No contracts wired for trading — the frontend keeps `trade`/`createToken` OFF here until a testnet deploy fills addresses in. Faucet-only network.
 
 | Contract | Address | Notes |
 |---|---|---|
 | PriceOracle | `0xcE0062be693EefF4e021bb7a8014A0d30C47dF0a` | Legacy admin oracle; replaced by OracleRouter in Phase 4 |
-| SpotPoolFactory | `0x0ff9a151D9BE48d9222f9C680Ce4052E7c1f7b98` | Constant-product AMM, 3 pools, 0.3% fee |
+| SpotPoolFactory | `0x0ff9a151D9BE48d9222f9C680Ce4052E7c1f7b98` | Constant-product AMM (V1), 3 pools, 0.3% fee |
 | PerpEngine | `0xbF6Ea775808485A19282C662A00Dbbbcae756D2B` | Perp engine, margin accounts, max 20× |
 | MockERC20 — TECHx | `0xCA70737705C71094827555a9b0015E05308F1326` | pairId=0, 18 dec |
 | MockERC20 — ENERGYx | `0xd463C6424c2776495A6EA88F575693D1fadcC5E6` | pairId=1, 18 dec |
 | MockERC20 — ARCx | `0x5642aC5570d6ee46D1ff86D499D0009370Fd0CAF` | pairId=2, 18 dec |
 | ArcexTimelock | PENDING Phase 0 deploy | 24h delay, proposer = admin multisig |
 | MarketRegistry | PENDING Phase 0 deploy | ADMIN_ROLE → Timelock, PAUSER_ROLE → admin multisig |
-
-## Deployed Contracts — Arc Mainnet (chainId 5042)
-
-| Contract | Address | Notes |
-|---|---|---|
-| ArcexTimelock | PENDING Phase 0 deploy | |
-| MarketRegistry | PENDING Phase 0 deploy | |
 
 ## Key Addresses
 - USDC (ERC-20, 6 dec, also native gas 18 dec on Arc): `0x3600000000000000000000000000000000000000`

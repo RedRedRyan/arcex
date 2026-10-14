@@ -8,13 +8,11 @@ const PriceChart = lazy(() => import("./PriceChart"));
 interface MarketCardProps {
   pair: Pair;
   onSpot: () => void;
-  onFutures: () => void;
 }
 
 export default function MarketCard({
   pair,
   onSpot,
-  onFutures,
 }: MarketCardProps) {
   const pool = usePoolFeed(pair.id);
 
@@ -94,7 +92,6 @@ export default function MarketCard({
           <PriceChart
             pairId={pair.id}
             variant="area"
-            source="pool"
             height={90}
             accentColor={pair.color}
           />
@@ -157,23 +154,6 @@ export default function MarketCard({
           }
         >
           Spot <ArrowRight size={13} />
-        </button>
-        <button
-          onClick={onFutures}
-          className="py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
-          style={{
-            background: "rgba(255,160,77,0.10)",
-            color: "var(--sunset)",
-            border: "1px solid rgba(255,160,77,0.22)",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "rgba(255,160,77,0.18)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "rgba(255,160,77,0.10)")
-          }
-        >
-          Futures <ArrowRight size={13} />
         </button>
       </div>
     </div>

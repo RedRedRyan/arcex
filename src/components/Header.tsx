@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import NavItems from "./NavItems";
 import UserDropdown from "./UserDropdown";
+import { NetworkBadge } from "../config/NetworkBadge";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
@@ -40,6 +41,7 @@ const Header = () => {
         <nav className="header-nav hidden sm:block">
           <NavItems />
         </nav>
+
         <UserDropdown />
       </div>
     </header>

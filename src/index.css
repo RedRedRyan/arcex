@@ -43,6 +43,9 @@
   .orange-btn {
     @apply h-10 cursor-pointer bg-[#ff7518] hover:bg-[#fb4f1f] text-white font-medium text-base rounded-3xl shadow-lg disabled:opacity-50;
   }
+  .deposit-btn {
+    @apply h-6 w-16 cursor-pointer bg-white hover:bg-[#fb4f1f] text-black font-medium text-sm rounded-3xl shadow-lg disabled:opacity-50;
+  }
 
   .header {
     @apply z-50 w-full h-[60px];
@@ -203,5 +206,748 @@ body {
 
   .header-nav a.active {
     color: var(--accent);
+  }
+
+  /* Slot for Dynamic's NetworkPicker (DynamicNav). It injects its own
+     shadow-DOM styles; this only governs how it sits in the navbar flow. */
+  .dynamic-nav-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .dynamic-nav-slot:empty {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTFOLIO — network-aware styling
+   Testnet = amber, Mainnet = emerald. Same layout, distinct identity.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-amber .total-value {
+  text-shadow: 0 0 22px rgba(245, 158, 11, 0.22);
+}
+.glow-emerald .total-value {
+  text-shadow: 0 0 22px rgba(16, 185, 129, 0.22);
+}
+
+/* Cross-fade on network switch */
+.fade-in {
+  animation: fade-in 180ms ease both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in {
+    animation: none;
+  }
+}
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 18px 64px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.head-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tagline {
+  font-size: 12.5px;
+  color: var(--subtle);
+}
+
+.explorer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--subtle);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 11px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.explorer-link:hover {
+  color: var(--ink);
+  border-color: var(--ink-2);
+}
+
+/* Total */
+.total-section {
+  margin-top: 22px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-muted), transparent);
+}
+.total-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.total-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--subtle);
+}
+.mainnet-badge {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.total-value {
+  font-size: 34px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.total-sub {
+  font-size: 12.5px;
+  color: var(--subtle);
+}
+
+.chart-slot {
+  margin-top: 16px;
+}
+.chart-skeleton {
+  padding: 4px 0;
+}
+.chart-legend {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.chart-change {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.chart-note {
+  font-size: 12px;
+  color: var(--subtle);
+}
+
+/* Quick actions */
+.quick-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn {
+  border-radius: 10px;
+  padding: 9px 15px;
+  font-size: 13.5px;
+  font-weight: 560;
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--surface);
+}
+.btn-soft {
+  color: var(--ink);
+  background: var(--surface-muted);
+}
+
+.notice {
+  margin-top: 14px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.notice-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+.notice-warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+/* Sections */
+.section {
+  margin-top: 30px;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 620;
+}
+.section-note {
+  font-size: 11.5px;
+  font-weight: 450;
+  color: var(--subtle);
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--subtle);
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.link-btn:hover {
+  color: var(--ink);
+}
+
+/* Asset cards — snap-scroll row on mobile */
+.asset-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 220px;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.asset-card {
+  scroll-snap-align: start;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+.asset-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.syn-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+.asset-ticker {
+  font-size: 13.5px;
+  font-weight: 620;
+}
+.asset-name {
+  font-size: 11.5px;
+  color: var(--subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asset-balance {
+  font-size: 18px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+.asset-balance span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--subtle);
+}
+.asset-value {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.asset-price {
+  font-size: 11.5px;
+  color: var(--subtle);
+  margin-top: 3px;
+}
+.pool-src {
+  opacity: 0.75;
+}
+
+.chg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  font-weight: 560;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.chg.up {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+.chg.down {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* USDC rows (mainnet) */
+.usdc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.usdc-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+.usdc-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.usdc-chain {
+  font-size: 13px;
+  font-weight: 560;
+}
+.usdc-err {
+  font-size: 11px;
+  color: #f87171;
+}
+.usdc-bal {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.usdc-link {
+  color: var(--subtle);
+  display: inline-flex;
+}
+.usdc-link:hover {
+  color: var(--ink);
+}
+.usdc-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  font-size: 13px;
+}
+.usdc-total strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Activity */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.activity-row:hover {
+  background: var(--surface-muted);
+}
+.act-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.act-dot.pos {
+  background: #10b981;
+}
+.act-dot.neg {
+  background: #ef4444;
+}
+.act-amount {
+  font-weight: 560;
+  min-width: 0;
+}
+.act-detail {
+  color: var(--subtle);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.act-time {
+  color: var(--subtle);
+  font-size: 11.5px;
+}
+
+/* Empty states */
+.empty-state {
+  max-width: 420px;
+  margin: 80px auto;
+  text-align: center;
+  color: var(--subtle);
+}
+.empty-state h2 {
+  color: var(--ink);
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.empty-note {
+  padding: 18px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--subtle);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+/* Skeleton */
+.sk {
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted) 25%,
+    var(--border) 50%,
+    var(--surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes sk-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .total-value {
+    font-size: 28px;
+  }
+  .asset-row {
+    grid-auto-columns: 78vw;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EARN — vault discovery and deposit (mainnet only)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.earn-disclaimer {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin-top: 8px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+
+  font-size: 12.5px;
+  color: var(--subtle);
+  line-height: 1.5;
+}
+.earn-disclaimer svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ink-2);
+}
+
+.earn-locked {
+  margin-top: 22px;
+}
+.earn-locked-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--subtle);
+}
+
+.vault-grid {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.vault-card {
+  @apply bg-gradient-to-br from-white/15 via-transparent to-transparent;
+  padding: 15px;
+  border-radius: 15px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.vault-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.vault-id {
+  flex: 1;
+  min-width: 0;
+}
+.vault-name {
+  font-size: 14px;
+  font-weight: 620;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vault-sub {
+  font-size: 11.5px;
+  color: var(--subtle);
+  margin-top: 1px;
+}
+
+.vault-apy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.vault-apy-value {
+  font-size: 17px;
+  font-weight: 660;
+  color: #10b981;
+  font-variant-numeric: tabular-nums;
+}
+.vault-apy-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+.vault-stats {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.vault-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.vault-stat-label {
+  font-size: 11.5px;
+  color: var(--subtle);
+}
+.vault-stat-value {
+  font-size: 11px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+.vault-stat-value.warn {
+  color: #f59e0b;
+}
+
+.vault-flags {
+  @apply flex flex-row mt-4;
+}
+.flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 560;
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+.flag-good {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+.flag-warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+.vault-contract {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--subtle);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.vault-contract:hover {
+  color: var(--ink);
+}
+
+/* Earn deposit popover */
+.deposit-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  animation: fade-in 160ms ease both;
+}
+.deposit-popover {
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.sheet-title {
+  font-size: 16px;
+  font-weight: 640;
+}
+.sheet-sub {
+  font-size: 12px;
+  color: var(--subtle);
+  margin-top: 3px;
+}
+.sheet-label {
+  display: block;
+  font-size: 12px;
+  color: var(--subtle);
+  margin-top: 16px;
+}
+.sheet-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.sheet-input:focus {
+  outline: none;
+  border-color: var(--ink-2);
+}
+.earn-connect-button {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+}
+.deposit-popover > .btn {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin-top: 16px;
+}
+.sheet-summary {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sheet-summary > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+.sheet-summary span {
+  color: var(--subtle);
+}
+.sheet-summary strong {
+  font-variant-numeric: tabular-nums;
+}
+.sheet-outcome {
+  margin-top: 13px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+}
+.deposit-transaction-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--accent);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.deposit-transaction-link:hover {
+  text-decoration: underline;
+}
+.sheet-actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 16px;
+}
+.sheet-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+.sheet-fine {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--subtle);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .vault-grid {
+    grid-template-columns: 1fr;
   }
 }

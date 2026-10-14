@@ -2,8 +2,8 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Link, NavLink } from "react-router-dom";
-import { ConnectKitButton } from "connectkit";
-import { formatAddress } from "../utils";
+import { DynamicNav } from "@dynamic-labs/sdk-react-core";
+import WalletButton from "./WalletButton";
 
 import { navLinks } from "../constants";
 
@@ -43,7 +43,6 @@ const Navbar = () => {
             <li key={link.path}>
               <NavLink
                 to={link.path}
-                end={link.path === "/"}
                 className={({ isActive }) => (isActive ? "active" : undefined)}
               >
                 {link.title}
@@ -51,27 +50,13 @@ const Navbar = () => {
             </li>
           ))}
         </ul>
-        <ConnectKitButton.Custom>
-          {({ isConnected, show, address, isConnecting }) => (
-            <button
-              onClick={show}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
-              style={{
-                background: isConnected
-                  ? "var(--surface-strong)"
-                  : "var(--accent)",
-                color: isConnected ? "var(--ink)" : "#fff",
-                border: isConnected ? "1px solid var(--border)" : "none",
-              }}
-            >
-              {isConnecting
-                ? "Connecting..."
-                : isConnected && address
-                  ? formatAddress(address)
-                  : "Connect Wallet"}
-            </button>
-          )}
-        </ConnectKitButton.Custom>
+        {/* Dynamic's own network switcher — lists every network registered in
+            overrides.evmNetworks (Arc Testnet, Arc Mainnet, Ethereum, Base).
+            It renders nothing until a wallet is connected. */}
+        <div className="dynamic-nav-slot">
+          <DynamicNav />
+        </div>
+        <WalletButton />
       </div>
     </nav>
   );

@@ -18,22 +18,12 @@ export const parseUsdc = (val: string): bigint => {
   return BigInt(Math.floor(n * 1_000_000));
 };
 
-export const formatPnl = (raw: bigint | undefined, decimals = 6): string => {
-  if (raw === undefined) return "$0.00";
-  const n = Number(raw) / 10 ** decimals;
-  const sign = n >= 0 ? "+" : "";
-  return `${sign}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-export const calcLiqPrice = (entryPrice: number, leverage: number, isLong: boolean, maintBps = 500): number => {
-  const invLevBps = 10000 / leverage;
-  const deltaBps = invLevBps - maintBps;
-  if (isLong) return entryPrice * (1 - deltaBps / 10000);
-  return entryPrice * (1 + deltaBps / 10000);
-};
-
+/**
+ * Explorer links default to Arc mainnet. For other chains use the relevant
+ * network configuration.
+ */
 export const getExplorerTxUrl = (hash: string) =>
-  `https://explorer.testnet.arc.io/tx/${hash}`;
+  `https://explorer.arc.io/tx/${hash}`;
 
 export const getExplorerAddressUrl = (addr: string) =>
-  `https://explorer.testnet.arc.io/address/${addr}`;
+  `https://explorer.arc.io/address/${addr}`;

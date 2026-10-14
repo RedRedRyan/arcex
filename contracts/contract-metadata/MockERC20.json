@@ -1,35 +1,4 @@
 {
-  "contractAddress": "0xe70d621729b3c306b8f97e75711c142bc3824ded",
-  "network": "ARC-TESTNET",
-  "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
-  "contract_code_path": "/home/user/app/contracts/MockERC20.sol",
-  "contract_compiled_code_path": "/home/user/app/contracts/out/MockERC20.sol/MockERC20.json",
-  "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xe70d621729b3c306b8f97e75711c142bc3824ded"
-  },
-  "contract_deployments": [
-    {
-      "chain": "Arc Testnet",
-      "address": "0xe70d621729b3c306b8f97e75711c142bc3824ded",
-      "explorerUrl": "https://explorer.testnet.arc.io/address/0xe70d621729b3c306b8f97e75711c142bc3824ded",
-      "txHash": "0x6f7b2dd09eaa77aab43036149e95c968c71a55008b368a7c44a413e3ca68a503",
-      "deployedAt": "2026-09-25T09:35:10.740Z"
-    },
-    {
-      "chain": "Arc Testnet",
-      "address": "0x485cb7c7ea822366e35d119def803e5074bbfd5d",
-      "explorerUrl": "https://explorer.testnet.arc.io/address/0x485cb7c7ea822366e35d119def803e5074bbfd5d",
-      "txHash": "0x0f31703a7b979267330ece299913cfd76bb9ed7240074ae505eb3203629339bc",
-      "deployedAt": "2026-09-25T09:34:59.669Z"
-    },
-    {
-      "chain": "Arc Testnet",
-      "address": "0xcf4fd3c37325756d71e85ab88f5e0394e134365c",
-      "explorerUrl": "https://explorer.testnet.arc.io/address/0xcf4fd3c37325756d71e85ab88f5e0394e134365c",
-      "txHash": "0x5ebfedb257061edf4c3f851e84d8792eaf5f302645d01a353bd4a5bcff1ee6c8",
-      "deployedAt": "2026-09-25T09:34:48.196Z"
-    }
-  ],
   "abi": [
     {
       "type": "constructor",

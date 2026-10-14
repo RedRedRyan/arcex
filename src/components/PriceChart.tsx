@@ -13,7 +13,6 @@ import {
   usePriceFeed,
   pricePrecision,
   type Candle,
-  type FeedSource,
 } from "../../data/OracleFeed";
 
 interface PriceChartProps {
@@ -26,8 +25,6 @@ interface PriceChartProps {
   accentColor?: string;
   /** Used only to size the price axis before the first read lands. */
   seedPrice?: number;
-  /** "pool" = spot AMM price (moves on swaps); "oracle" = admin oracle (perp mark price). */
-  source?: FeedSource;
 }
 
 const BG = "#0a0f1a";
@@ -51,7 +48,6 @@ export default function PriceChart({
   className = "",
   accentColor = "#fb4f1f",
   seedPrice,
-  source = "oracle",
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -59,7 +55,7 @@ export default function PriceChart({
     ISeriesApi<"Candlestick"> | ISeriesApi<"Area"> | null
   >(null);
   const epochRef = useRef(-1);
-  const feed = usePriceFeed(pairId, source);
+  const feed = usePriceFeed(pairId);
   const isCandle = variant === "candle";
 
   // Create the chart once per (variant, height, accent); destroy on cleanup.
@@ -137,7 +133,7 @@ export default function PriceChart({
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [isCandle, height, accentColor, seedPrice, pairId, source]);
+  }, [isCandle, height, accentColor, seedPrice, pairId]);
 
   // Push feed data: full setData when the set was rebuilt, update() per tick.
   useEffect(() => {

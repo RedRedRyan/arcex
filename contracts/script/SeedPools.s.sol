@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {SpotPoolFactory} from "../SpotPoolFactory.sol";
+import {SpotPoolFactoryV2} from "../SpotPoolFactoryV2.sol";
 import {MockERC20} from "../MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -34,7 +34,7 @@ contract SeedPools is Script {
         uint256 deployerKey = vm.envUint("ARC_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
 
-        SpotPoolFactory spotPool = SpotPoolFactory(vm.envAddress("SPOT_POOL_ADDRESS"));
+        SpotPoolFactoryV2 spotPool = SpotPoolFactoryV2(vm.envAddress("SPOT_POOL_ADDRESS"));
         MockERC20 techx = MockERC20(vm.envAddress("TECHX_ADDRESS"));
         MockERC20 energyx = MockERC20(vm.envAddress("ENERGYX_ADDRESS"));
         MockERC20 arcx = MockERC20(vm.envAddress("ARCX_ADDRESS"));
@@ -49,7 +49,7 @@ contract SeedPools is Script {
         uint256 baseArcx = (usdcArcx * 1e20) / ARCX_PRICE;
 
         console2.log("Seeding pools from:", deployer);
-        console2.log("SpotPoolFactory    :", address(spotPool));
+        console2.log("SpotPoolFactoryV2   :", address(spotPool));
 
         vm.startBroadcast(deployerKey);
 

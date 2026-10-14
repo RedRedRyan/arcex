@@ -8,12 +8,7 @@ import {
   parseAbiItem,
   type Address,
 } from "viem";
-import { arcTestnet } from "viem/chains";
-import {
-  ARC_USDC_ADDRESS,
-  BASE_TOKENS,
-  CONTRACT_ADDRESSES,
-} from "../src/constants";
+import { NETWORKS, type NetworkName } from "../src/config/networks";
 import { supabase } from "../src/utils/supabase";
 
 const REFRESH_MS = 3_000;
@@ -21,17 +16,30 @@ const CANDLE_SECONDS = 300;
 const MAX_CANDLES = 288;
 const POOL_ABI = parseAbi([
   "function pools(uint8 pairId) view returns (address baseToken, uint128 reserveUSDC, uint128 reserveBase, bool active)",
+  "function pairCount() view returns (uint256)",
+  "function pairIds(uint256 index) view returns (uint8)",
   "event LiquidityAdded(uint8 indexed pairId, address indexed provider, uint256 amountUSDC, uint256 amountBase, uint256 lpMinted)",
   "event LiquidityRemoved(uint8 indexed pairId, address indexed provider, uint256 amountUSDC, uint256 amountBase, uint256 lpBurned)",
   "event Swap(uint8 indexed pairId, address indexed sender, bool usdcIn, uint256 amountIn, uint256 amountOut, address indexed to)",
+  "event PairCreated(uint8 indexed pairId, address indexed baseToken, address indexed creator)",
 ]);
 const TRANSFER_EVENT = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 value)",
 );
 const PAIR_IDS = [0, 1, 2] as const;
-const TOKEN_ADDRESSES = [ARC_USDC_ADDRESS, ...PAIR_IDS.map((id) => BASE_TOKENS[id])] as Address[];
-const CACHE_PREFIX = "arcex-market-v2";
-const BALANCE_CACHE_PREFIX = "arcex-wallet-balances-v1";
+
+/** The SpotPoolFactoryV2 address for the active network. */
+function spotPoolAddress(network: NetworkName): Address {
+  return NETWORKS[network].contracts.spotPool;
+}
+
+/** Base token addresses (USDC first, then pairs 0/1/2) for the active network. */
+function tokenAddresses(network: NetworkName): Address[] {
+  const cfg = NETWORKS[network];
+  return [cfg.usdcAddress, ...cfg.pairs.map((p) => p.baseToken)] as Address[];
+}
+const CACHE_PREFIX = "arcex-market-v3";
+const BALANCE_CACHE_PREFIX = "arcex-wallet-balances-v2";
 
 export interface MarketCandle {
   time: number;
@@ -43,6 +51,7 @@ export interface MarketCandle {
 
 export interface MarketPairSnapshot {
   status: "connecting" | "live" | "error";
+  active: boolean;
   price: number | null;
   reserveBase: bigint | null;
   reserveQuote: bigint | null;
@@ -113,18 +122,45 @@ function isIndexedCandleRow(value: unknown): value is IndexedCandleRow {
   );
 }
 
-const primaryRpc =
-  arcTestnet.rpcUrls.default.http[2] ?? arcTestnet.rpcUrls.default.http[0];
-const fallbackRpc = arcTestnet.rpcUrls.default.http[0] ?? primaryRpc;
-const client = createPublicClient({
-  chain: arcTestnet,
-  transport: fallback([
-    http(primaryRpc, { batch: { wait: 20, batchSize: 100 } }),
-    http(fallbackRpc, {
-      batch: { wait: 20, batchSize: 100 },
-    }),
-  ]),
-});
+/**
+ * Per-network public clients, built from config/networks.ts.
+ *
+ * Keyed by NetworkName so a switch gets a fresh client bound to that network's
+ * chain and RPCs — no stale testnet client can serve mainnet data.
+ */
+const clients: Partial<Record<NetworkName, ReturnType<typeof createPublicClient>>> = {};
+
+export function publicClientFor(network: NetworkName) {
+  const cached = clients[network];
+  if (cached) return cached;
+
+  const cfg = NETWORKS[network];
+  const transports = cfg.rpcUrls.map((url) =>
+    http(url, { batch: { wait: 20, batchSize: 100 } }),
+  );
+
+  const client = createPublicClient({
+    chain: cfg.chain,
+    transport: transports.length > 1 ? fallback(transports) : transports[0],
+  });
+  clients[network] = client;
+  return client;
+}
+
+/** The network currently selected by NetworkProvider. */
+let activeNetwork: NetworkName = "mainnet";
+
+export function setActiveNetwork(network: NetworkName): void {
+  if (activeNetwork === network) return;
+  activeNetwork = network;
+  networkChangeHandler?.(network);
+}
+
+let networkChangeHandler: ((network: NetworkName) => void) | null = null;
+
+export function getActiveNetwork(): NetworkName {
+  return activeNetwork;
+}
 
 const priceFromReserves = (reserveQuote: bigint, reserveBase: bigint) =>
   reserveBase > 0n
@@ -133,6 +169,7 @@ const priceFromReserves = (reserveQuote: bigint, reserveBase: bigint) =>
 
 const initialPair = (): MarketPairSnapshot => ({
   status: "connecting",
+  active: false,
   price: null,
   reserveBase: null,
   reserveQuote: null,
@@ -148,10 +185,13 @@ const initialPair = (): MarketPairSnapshot => ({
   low24h: null,
 });
 
-function readCachedPair(pairId: number): CachedPair | null {
+function readCachedPair(
+  pairId: number,
+  network: NetworkName = activeNetwork,
+): CachedPair | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(`${CACHE_PREFIX}:${pairId}`);
+    const raw = localStorage.getItem(`${CACHE_PREFIX}:${network}:${pairId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedPair;
     if (!Array.isArray(parsed.candles) || !Array.isArray(parsed.trades))
@@ -163,8 +203,11 @@ function readCachedPair(pairId: number): CachedPair | null {
   }
 }
 
-function cachedSnapshot(pairId: number): MarketPairSnapshot {
-  const cached = readCachedPair(pairId);
+function cachedSnapshot(
+  pairId: number,
+  network: NetworkName = activeNetwork,
+): MarketPairSnapshot {
+  const cached = readCachedPair(pairId, network);
   if (!cached) return initialPair();
   return {
     ...initialPair(),
@@ -205,10 +248,14 @@ function summarizeCandles(candles: MarketCandle[]) {
 }
 
 class MarketStore {
-  private readonly pairSnapshots = PAIR_IDS.map(cachedSnapshot);
-  private readonly trades = PAIR_IDS.map((pairId) => readCachedPair(pairId)?.trades ?? []);
-  private readonly historyBlocks = PAIR_IDS.map((pairId) => {
-    const value = readCachedPair(pairId)?.lastProcessedBlock;
+  private pairSnapshots = PAIR_IDS.map((pairId) =>
+    cachedSnapshot(pairId, activeNetwork),
+  );
+  private trades = PAIR_IDS.map(
+    (pairId) => readCachedPair(pairId, activeNetwork)?.trades ?? [],
+  );
+  private historyBlocks = PAIR_IDS.map((pairId) => {
+    const value = readCachedPair(pairId, activeNetwork)?.lastProcessedBlock;
     return value ? BigInt(value) : null;
   });
   private readonly pairListeners = PAIR_IDS.map(() => new Set<() => void>());
@@ -218,11 +265,41 @@ class MarketStore {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private walletRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshInFlight: Promise<void> | null = null;
+  private refreshAgain = false;
+  private networkEpoch = 0;
   private refreshingAddress: string | null = null;
   private queuedWalletAddress: Address | null = null;
   private indexedHistoryLoaded = false;
   private indexedHistoryAttemptAt = 0;
   private indexedHistoryRequest: Promise<void> | null = null;
+
+  handleNetworkChange(network: NetworkName) {
+    const epoch = ++this.networkEpoch;
+    this.pairSnapshots = PAIR_IDS.map((pairId) => cachedSnapshot(pairId, network));
+    this.trades = PAIR_IDS.map(
+      (pairId) => readCachedPair(pairId, network)?.trades ?? [],
+    );
+    this.historyBlocks = PAIR_IDS.map((pairId) => {
+      const value = readCachedPair(pairId, network)?.lastProcessedBlock;
+      return value ? BigInt(value) : null;
+    });
+    this.indexedHistoryLoaded = false;
+    this.indexedHistoryAttemptAt = 0;
+    this.indexedHistoryRequest = null;
+
+    queueMicrotask(() => {
+      if (epoch !== this.networkEpoch) return;
+      this.walletWatchers.forEach((stop) => stop());
+      this.walletWatchers.clear();
+      for (const [key, listeners] of this.walletListeners) {
+        if (listeners.size > 0) this.ensureWalletWatcher(key as Address);
+        this.emitWallet(key);
+      }
+      PAIR_IDS.forEach((pairId) => this.emitPair(pairId));
+      void this.loadIndexedHistory();
+      void this.refresh();
+    });
+  }
 
   subscribePair = (pairId: number, listener: () => void) => {
     this.pairListeners[pairId]?.add(listener);
@@ -258,7 +335,7 @@ class MarketStore {
   };
 
   getWalletSnapshot = (address: Address): WalletBalanceSnapshot | null => {
-    const key = address.toLowerCase();
+    const key = `${activeNetwork}:${address.toLowerCase()}`;
     const cached = this.walletSnapshots.get(key);
     if (cached) return cached;
     if (typeof localStorage === "undefined") return null;
@@ -291,12 +368,13 @@ class MarketStore {
     }, REFRESH_MS);
   }
 
-  private loadIndexedHistory(): Promise<void> {
+  private loadIndexedHistory(network: NetworkName = activeNetwork): Promise<void> {
     if (!supabase || this.indexedHistoryLoaded) return Promise.resolve();
     if (this.indexedHistoryRequest) return this.indexedHistoryRequest;
     if (Date.now() - this.indexedHistoryAttemptAt < 60_000)
       return Promise.resolve();
     this.indexedHistoryAttemptAt = Date.now();
+    const epoch = this.networkEpoch;
 
     const request = (async () => {
       const since = new Date(Date.now() - 86_400_000).toISOString();
@@ -305,13 +383,14 @@ class MarketStore {
         .select(
           "pair_id,open_time,open,high,low,close,volume",
         )
-        .eq("chain_id", arcTestnet.id)
+        .eq("chain_id", NETWORKS[network].chainId)
         .eq("timeframe_seconds", CANDLE_SECONDS)
         .in("pair_id", [...PAIR_IDS])
         .gte("open_time", since)
         .order("open_time", { ascending: true })
         .limit(900);
       if (error) throw new Error(`Could not load indexed candles: ${error.message}`);
+      if (epoch !== this.networkEpoch || network !== activeNetwork) return;
 
       const byPair = PAIR_IDS.map(() => [] as (MarketCandle & { volume: number })[]);
       const rows: unknown[] = data;
@@ -375,14 +454,15 @@ class MarketStore {
         };
         if (snapshot.price !== null)
           this.pushPrice(pairId, snapshot.price, Math.floor(Date.now() / 1_000));
-        this.persistPair(pairId);
+        this.persistPair(pairId, network);
         this.emitPair(pairId);
       }
       this.indexedHistoryLoaded = data.length > 0;
     })().catch((error: unknown) => {
       console.warn("Indexed candles are unavailable; keeping cached/live data.", error);
     }).finally(() => {
-      this.indexedHistoryRequest = null;
+      if (this.indexedHistoryRequest === request)
+        this.indexedHistoryRequest = null;
     });
     this.indexedHistoryRequest = request;
     return request;
@@ -413,8 +493,9 @@ class MarketStore {
   private ensureWalletWatcher(address: Address) {
     const key = address.toLowerCase();
     if (this.walletWatchers.has(key)) return;
-    const stop = client.watchEvent({
-      address: TOKEN_ADDRESSES,
+    const network = activeNetwork;
+    const stop = publicClientFor(network).watchEvent({
+      address: tokenAddresses(network),
       event: TRANSFER_EVENT,
       pollingInterval: REFRESH_MS,
       onLogs: (logs) => {
@@ -439,7 +520,7 @@ class MarketStore {
   }
 
   private setWalletUpdating(address: Address, updating: boolean) {
-    const key = address.toLowerCase();
+    const key = `${activeNetwork}:${address.toLowerCase()}`;
     const current = this.getWalletSnapshot(address);
     if (!current) return;
     const next = { ...current, updating };
@@ -451,13 +532,16 @@ class MarketStore {
     if (this.refreshInFlight) {
       if (address && this.refreshingAddress !== address.toLowerCase())
         this.queuedWalletAddress = address;
+      this.refreshAgain = true;
       return;
     }
+    const network = activeNetwork;
+    const epoch = this.networkEpoch;
     this.refreshingAddress = address?.toLowerCase() ?? null;
     this.refreshInFlight = (async () => {
       let nextAddress = address;
       do {
-        await this.refreshAll(nextAddress);
+        await this.refreshAll(nextAddress, network, epoch);
         nextAddress = this.queuedWalletAddress ?? undefined;
         this.queuedWalletAddress = null;
         this.refreshingAddress = nextAddress?.toLowerCase() ?? null;
@@ -469,40 +553,53 @@ class MarketStore {
       this.refreshInFlight = null;
       this.refreshingAddress = null;
       this.queuedWalletAddress = null;
+      const shouldRefresh = this.refreshAgain || epoch !== this.networkEpoch;
+      this.refreshAgain = false;
+      if (shouldRefresh) void this.refresh();
     }
   }
 
-  private async refreshAll(address?: Address) {
-    void this.loadIndexedHistory();
+  private async refreshAll(
+    address: Address | undefined,
+    network: NetworkName,
+    epoch: number,
+  ) {
+    void this.loadIndexedHistory(network);
     try {
-      const contracts = [
-        ...PAIR_IDS.map((pairId) => ({
-          address: CONTRACT_ADDRESSES.spotPool,
-          abi: POOL_ABI,
-          functionName: "pools" as const,
-          args: [pairId] as const,
-        })),
-        ...(address
-          ? TOKEN_ADDRESSES.map((token) => ({
-              address: token,
-              abi: erc20Abi,
-              functionName: "balanceOf" as const,
-              args: [address] as const,
-            }))
-          : []),
-      ];
-      const [blockNumber, results] = await Promise.all([
+      const client = publicClientFor(network);
+      const poolAddress = spotPoolAddress(network);
+      const [blockNumber, pools, balances] = await Promise.all([
         client.getBlockNumber(),
-        client.multicall({ contracts, allowFailure: true }),
+        Promise.all(
+          PAIR_IDS.map((pairId) =>
+            client.readContract({
+              address: poolAddress,
+              abi: POOL_ABI,
+              functionName: "pools",
+              args: [pairId],
+            }),
+          ),
+        ),
+        address
+          ? Promise.all(
+              tokenAddresses(network).map((token) =>
+                client.readContract({
+                  address: token,
+                  abi: erc20Abi,
+                  functionName: "balanceOf",
+                  args: [address],
+                }),
+              ),
+            )
+          : Promise.resolve([] as bigint[]),
       ]);
+      if (epoch !== this.networkEpoch || network !== activeNetwork) return;
 
-      const pools = results.slice(0, PAIR_IDS.length);
-      await this.mergeDeltaLogs(blockNumber, pools);
+      await this.mergeDeltaLogs(blockNumber, pools, network, client, epoch);
+      if (epoch !== this.networkEpoch || network !== activeNetwork) return;
 
       for (const pairId of PAIR_IDS) {
-        const result = results[pairId];
-        if (result.status !== "success") throw result.error;
-        const pool = result.result as readonly [Address, bigint, bigint, boolean];
+        const pool = pools[pairId];
         const reserveQuote = pool[1];
         const reserveBase = pool[2];
         const price = priceFromReserves(reserveQuote, reserveBase);
@@ -510,13 +607,14 @@ class MarketStore {
         this.pairSnapshots[pairId] = {
           ...this.pairSnapshots[pairId],
           status: "live",
+          active: pool[3],
           price,
           reserveQuote,
           reserveBase,
           lastUpdatedBlock: blockNumber,
           updatedAt: Math.floor(Date.now() / 1000),
         };
-        const cached = readCachedPair(pairId);
+        const cached = readCachedPair(pairId, network);
         const checkpoint = cached?.lastProcessedBlock
           ? BigInt(cached.lastProcessedBlock)
           : null;
@@ -531,32 +629,29 @@ class MarketStore {
       }
 
       if (address) {
-        const balanceResults = results.slice(PAIR_IDS.length);
-        if (balanceResults.length === TOKEN_ADDRESSES.length) {
-          const current = balanceResults.map((result) => {
-            if (result.status !== "success") throw result.error;
-            return result.result as bigint;
-          });
+        if (balances.length === tokenAddresses(network).length) {
           const snapshot: WalletBalanceSnapshot = {
-            usdc: Number(current[0]) / 1e6,
+            usdc: Number(balances[0] ?? 0n) / 1e6,
             tokens: [
-              Number(current[1]) / 1e18,
-              Number(current[2]) / 1e18,
-              Number(current[3]) / 1e18,
+              Number(balances[1] ?? 0n) / 1e18,
+              Number(balances[2] ?? 0n) / 1e18,
+              Number(balances[3] ?? 0n) / 1e18,
             ],
             updatedAt: Date.now(),
             updating: false,
           };
-          this.walletSnapshots.set(address.toLowerCase(), snapshot);
+          const walletKey = `${network}:${address.toLowerCase()}`;
+          this.walletSnapshots.set(walletKey, snapshot);
           if (typeof localStorage !== "undefined")
             localStorage.setItem(
-              `${BALANCE_CACHE_PREFIX}:${address.toLowerCase()}`,
+              `${BALANCE_CACHE_PREFIX}:${walletKey}`,
               JSON.stringify(snapshot),
             );
           this.emitWallet(address.toLowerCase());
         }
       }
     } catch (error) {
+      if (epoch !== this.networkEpoch || network !== activeNetwork) return;
       console.warn("Market data refresh failed; retaining last known values.", error);
       for (const pairId of PAIR_IDS) {
         this.pairSnapshots[pairId] = {
@@ -569,7 +664,13 @@ class MarketStore {
     }
   }
 
-  private async mergeDeltaLogs(blockNumber: bigint, pools: unknown[]) {
+  private async mergeDeltaLogs(
+    blockNumber: bigint,
+    pools: readonly (readonly [Address, bigint, bigint, boolean])[],
+    network: NetworkName,
+    client: ReturnType<typeof createPublicClient>,
+    epoch: number,
+  ) {
     const checkpoints = this.historyBlocks.filter(
       (checkpoint): checkpoint is bigint => checkpoint !== null,
     );
@@ -585,11 +686,12 @@ class MarketStore {
 
     try {
       const logs = await client.getLogs({
-        address: CONTRACT_ADDRESSES.spotPool,
-        events: [POOL_ABI[1], POOL_ABI[2], POOL_ABI[3]],
+        address: spotPoolAddress(network),
+        events: [POOL_ABI[3], POOL_ABI[4], POOL_ABI[5]],
         fromBlock,
         toBlock: blockNumber,
       });
+      if (epoch !== this.networkEpoch || network !== activeNetwork) return;
       const events: PoolEvent[] = [];
       for (const log of logs) {
         if (log.blockNumber === null || log.logIndex === null) continue;
@@ -613,7 +715,9 @@ class MarketStore {
               ? "swap"
               : log.eventName === "LiquidityAdded"
                 ? "add"
-                : "remove",
+                : log.eventName === "LiquidityRemoved"
+                  ? "remove"
+                  : "swap",
           usdcIn: args.usdcIn as boolean | undefined,
           amountIn: args.amountIn as bigint | undefined,
           amountOut: args.amountOut as bigint | undefined,
@@ -631,12 +735,10 @@ class MarketStore {
             : 1,
       );
 
-      const reserveStates = pools.map((result) => {
-        if (!result || (result as { status?: string }).status !== "success")
-          return { reserveQuote: 0n, reserveBase: 0n };
-        const pool = (result as { result: readonly [Address, bigint, bigint, boolean] }).result;
-        return { reserveQuote: pool[1], reserveBase: pool[2] };
-      });
+      const reserveStates = pools.map((pool) => ({
+        reserveQuote: pool[1],
+        reserveBase: pool[2],
+      }));
       const timestamps = new Map<bigint, number>();
       const blocks = [...new Set(events.map((event) => event.blockNumber))]
         .sort((a, b) => (a > b ? -1 : 1))
@@ -648,6 +750,7 @@ class MarketStore {
             timestamps.set(block, Number(data.timestamp));
           }),
         );
+        if (epoch !== this.networkEpoch || network !== activeNetwork) return;
       }
 
       for (const pairId of PAIR_IDS) {
@@ -757,12 +860,12 @@ class MarketStore {
     };
   }
 
-  private persistPair(pairId: number) {
+  private persistPair(pairId: number, network: NetworkName = activeNetwork) {
     if (typeof localStorage === "undefined") return;
     const snapshot = this.pairSnapshots[pairId];
     try {
       localStorage.setItem(
-        `${CACHE_PREFIX}:${pairId}`,
+        `${CACHE_PREFIX}:${network}:${pairId}`,
         JSON.stringify({
           reserveBase: snapshot.reserveBase?.toString() ?? null,
           reserveQuote: snapshot.reserveQuote?.toString() ?? null,
@@ -788,6 +891,7 @@ class MarketStore {
 }
 
 export const marketStore = new MarketStore();
+networkChangeHandler = (network) => marketStore.handleNetworkChange(network);
 
 export function useMarketPair(pairId: number): MarketPairSnapshot {
   const subscribe = useCallback(

@@ -1,7 +1,6 @@
 export type PairId = 0 | 1 | 2;
-export type TradingMode = "spot" | "futures";
 export type OrderSide = "buy" | "sell";
-export type Page = "market" | "spot" | "futures" | "portfolio" | "faucet";
+export type Page = "market" | "spot" | "portfolio" | "faucet";
 
 export interface Pair {
   readonly id: number;
@@ -15,14 +14,3 @@ export interface Pair {
   readonly seedPrice?: number;
 }
 
-export interface OpenPosition {
-  pairId: number;
-  ticker: string;
-  isLong: boolean;
-  sizeUsdc: bigint;
-  entryPrice: bigint;
-  margin: bigint;
-  leverage: number;
-  openTimestamp: bigint;
-  isOpen: boolean;
-}

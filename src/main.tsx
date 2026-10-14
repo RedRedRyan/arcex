@@ -25,6 +25,7 @@ import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
 
 import { config, arcEvmNetworks } from "./config";
+import { NetworkProvider } from "./config/NetworkProvider";
 import App from "./App";
 import "./index.css";
 
@@ -102,10 +103,15 @@ createRoot(document.getElementById("root")!).render(
         walletConnectors: [EthereumWalletConnectors],
         // Only show EVM wallets; Arc is an EVM chain
         initialAuthenticationMode: "connect-only",
-        // Register Arc Testnet + Mainnet so the wallet modal shows them.
+        // Enable EVM bridging across Arc Mainnet, Ethereum, and Base. These
+        // supported networks are registered in overrides.evmNetworks below.
+        bridgeChains: [
+          {
+            chain: "EVM",
+          },
+        ],
         // Using overrides.evmNetworks replaces the dashboard-configured network
-        // list entirely — pass a merger function instead of an array if you want
-        // to keep other dashboard chains too.
+        // list entirely, so only Arc Mainnet, Ethereum, and Base are enabled.
         overrides: {
           evmNetworks: arcEvmNetworks,
         },
@@ -113,15 +119,17 @@ createRoot(document.getElementById("root")!).render(
     >
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
-          <DynamicWagmiConnector>
-            <BrowserRouter>
-              <App />
-              <StudioWatermark />
-              <Toaster position="top-center" />
-            </BrowserRouter>
-          </DynamicWagmiConnector>
+          <NetworkProvider>
+            <DynamicWagmiConnector>
+              <BrowserRouter>
+                <App />
+                <StudioWatermark />
+                <Toaster position="top-center" />
+              </BrowserRouter>
+            </DynamicWagmiConnector>
+          </NetworkProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </DynamicContextProvider>
-  </StrictMode>
+  </StrictMode>,
 );

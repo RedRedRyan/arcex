@@ -1,6 +1,9 @@
 # ── Secrets — NEVER commit ───────────────────────────────────────────────────
 .env
 .env.*
+recovery/
+circle-secret/node_modules/
+circle-secret/package-lock.json
 !.env.example
 !**/.env.example
 

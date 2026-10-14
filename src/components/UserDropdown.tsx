@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { arcTestnet } from "viem/chains";
 import { ChevronDown, Copy, ExternalLink, LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -9,20 +8,25 @@ import {
   useDynamicContext,
 } from "@dynamic-labs/sdk-react-core";
 import NavItems from "./NavItems";
-import { formatAddress, formatUsdc } from "../utils";
-import { useWalletBalances } from "../../data/MarketStore";
-
-const EXPLORER_URL = arcTestnet.blockExplorers.default.url;
+import { formatAddress } from "../utils";
+import { usePortfolio } from "../../data/UsePortfolio";
+import { useNetwork } from "../config/NetworkProvider";
+import { explorerAddressUrl } from "../config/networks";
 
 const UserDropdown = () => {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { handleLogOut, setShowDynamicUserProfile } = useDynamicContext();
-  const walletBalances = useWalletBalances(
-    isConnected ? address : undefined,
-  );
+  const { config, network, isMainnet } = useNetwork();
+  // Same hook as the Portfolio page, so the number here always matches.
+  const portfolio = usePortfolio();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // If the wallet is not on the active network's chain, the numbers below
+  // would be for a different world — say so instead of showing wrong values.
+  const walletChainMismatch =
+    isConnected && chainId !== undefined && chainId !== config.chain.id;
 
   useEffect(() => {
     if (!open) return;
@@ -120,9 +124,10 @@ const UserDropdown = () => {
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-16 rounded-lg flex flex-col items-center">
               <span className="text-orange-500 text-lg font-medium">
-                {formatUsdc(
-                  BigInt(Math.round((walletBalances?.usdc ?? 0) * 1e6)),
-                )}
+                {portfolio.usdcTotal.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </span>
               <span className="text-white text-xs">usdc</span>
             </div>
@@ -131,8 +136,26 @@ const UserDropdown = () => {
                 {formatAddress(address)}
               </span>
               <span className="text-xs" style={{ color: "var(--subtle)" }}>
-                {arcTestnet.name}
+                {isMainnet ? "Mainnet" : "Testnet"} · {config.label}
+                {isMainnet && (
+                  <span title="Total USDC across Arc, Ethereum and Base">
+                    {" "}
+                    · 3 chains
+                  </span>
+                )}
               </span>
+              {walletChainMismatch && (
+                <span
+                  className="mt-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+                  style={{
+                    background: "rgba(245, 158, 11, 0.15)",
+                    color: "#f59e0b",
+                  }}
+                >
+                  Switch wallet network to see {isMainnet ? "mainnet" : "testnet"}{" "}
+                  balances
+                </span>
+              )}
             </div>
           </div>
 
@@ -140,7 +163,6 @@ const UserDropdown = () => {
           <nav className="sm:hidden">
             <NavItems onNavigate={() => setOpen(false)} />
           </nav>
-          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
 
           <button
             type="button"
@@ -167,7 +189,7 @@ const UserDropdown = () => {
 
           <a
             role="menuitem"
-            href={`${EXPLORER_URL}/address/${address}`}
+            href={explorerAddressUrl(network, address)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}

@@ -30,7 +30,7 @@ export default function SparklineChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const epochRef = useRef(-1);
-  const feed = usePriceFeed(pairId, "pool");
+  const feed = usePriceFeed(pairId);
 
   useEffect(() => {
     const element = containerRef.current;

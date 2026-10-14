@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { ExternalLink, Droplets, Zap, Copy } from "lucide-react";
-import { arcTestnet } from "viem/chains";
-import {
-  ARC_USDC_ADDRESS,
-  CONTRACT_ADDRESSES,
-  BASE_TOKENS,
-  PAIRS,
-} from "../constants";
-
-const EXPLORER_URL = arcTestnet.blockExplorers.default.url;
-const RPC_URL = arcTestnet.rpcUrls.default.http[0];
+import { useNetwork } from "../config/NetworkProvider";
 
 const CopyAddress = ({ label, addr }: { label: string; addr: string }) => {
   const [copied, setCopied] = useState(false);
@@ -74,6 +65,12 @@ const InfoRow = ({
 };
 
 const FaucetPage = () => {
+  const { config } = useNetwork();
+  const usdcAddress = config.usdcAddress;
+  const contracts = config.contracts;
+  const pairs = config.pairs;
+  const explorerUrl = config.explorerUrl;
+  const rpcUrl = config.rpcUrls[0];
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 max-w-2xl space-y-8">
       <div>
@@ -191,13 +188,13 @@ const FaucetPage = () => {
         }}
       >
         <h2 className="display font-semibold" style={{ color: "var(--ink)" }}>
-          Arc Testnet Details
+          {config.label} Details
         </h2>
         <div className="space-y-3">
-          <InfoRow label="Network name" value={arcTestnet.name} />
-          <InfoRow label="Chain ID" value={String(arcTestnet.id)} mono />
-          <InfoRow label="RPC URL" value={RPC_URL} mono />
-          <InfoRow label="Explorer" value={EXPLORER_URL} mono />
+          <InfoRow label="Network name" value={config.chain.name} />
+          <InfoRow label="Chain ID" value={String(config.chainId)} mono />
+          <InfoRow label="RPC URL" value={rpcUrl} mono />
+          <InfoRow label="Explorer" value={explorerUrl} mono />
           <InfoRow label="Currency" value="USDC (gas + ERC-20)" />
         </div>
       </div>
@@ -216,21 +213,17 @@ const FaucetPage = () => {
         >
           Contract Addresses
         </h2>
-        <CopyAddress label="USDC (ERC-20)" addr={ARC_USDC_ADDRESS} />
+        <CopyAddress label="USDC (ERC-20)" addr={usdcAddress} />
         <CopyAddress
-          label="SpotPoolFactory"
-          addr={CONTRACT_ADDRESSES.spotPool}
+          label="SpotPoolFactoryV2"
+          addr={contracts.spotPool}
         />
-        <CopyAddress label="PerpEngine" addr={CONTRACT_ADDRESSES.perpEngine} />
-        <CopyAddress
-          label="PriceOracle"
-          addr={CONTRACT_ADDRESSES.priceOracle}
-        />
-        {[0, 1, 2].map((id) => (
+        <CopyAddress label="TokenFactory" addr={contracts.tokenFactory} />
+        {pairs.map((p) => (
           <CopyAddress
-            key={id}
-            label={`${PAIRS[id as 0 | 1 | 2].ticker} Mock Token`}
-            addr={BASE_TOKENS[id]}
+            key={p.id}
+            label={`${p.ticker} Mock Token`}
+            addr={p.baseToken}
           />
         ))}
       </div>
@@ -238,13 +231,12 @@ const FaucetPage = () => {
       {/* Explorer links */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: "SpotPool Explorer", addr: CONTRACT_ADDRESSES.spotPool },
-          { label: "PerpEngine Explorer", addr: CONTRACT_ADDRESSES.perpEngine },
-          { label: "Oracle Explorer", addr: CONTRACT_ADDRESSES.priceOracle },
+          { label: "SpotPool Explorer", addr: contracts.spotPool },
+          { label: "TokenFactory Explorer", addr: contracts.tokenFactory },
         ].map(({ label, addr }) => (
           <a
             key={addr}
-            href={`${EXPLORER_URL}/address/${addr}`}
+            href={`${explorerUrl}/address/${addr}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-medium transition-all"

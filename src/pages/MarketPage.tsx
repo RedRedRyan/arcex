@@ -74,7 +74,6 @@ const MarketPage = () => {
   const navigate = useNavigate();
 
   const goSpot = (pairId: PairId) => navigate(`/spot?pair=${pairId}`);
-  const goFutures = (pairId: PairId) => navigate(`/futures?pair=${pairId}`);
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-8 max-w-screen-2xl bg-transparent">
@@ -157,7 +156,6 @@ const MarketPage = () => {
             key={pair.id}
             pair={{ ...pair }}
             onSpot={() => goSpot(pair.id)}
-            onFutures={() => goFutures(pair.id)}
           />
         ))}
       </div>
@@ -176,8 +174,8 @@ const MarketPage = () => {
           accent="#fb4f1f"
         />
         <InfoCard
-          title="Perpetuals"
-          body="Up to 20× leverage. Isolated margin per position. Perp mark price comes from the on-chain oracle."
+          title="Token Factory"
+          body="Create your own ERC-20 in one click and open a USDC-quoted pool for it. Share the trade page link anywhere."
           accent="#ffa04d"
         />
         <InfoCard

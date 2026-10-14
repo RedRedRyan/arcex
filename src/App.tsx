@@ -7,9 +7,13 @@ import { Analytics } from "@vercel/analytics/react";
 
 const MarketPage = lazy(() => import("./pages/MarketPage"));
 const SpotPage = lazy(() => import("./pages/SpotPage"));
-const FuturesPage = lazy(() => import("./pages/FuturesPage"));
+const SwapPage = lazy(() => import("./pages/SwapPage"));
 const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
 const FaucetPage = lazy(() => import("./pages/FaucetPage"));
+const CreateTokenPage = lazy(() => import("./pages/CreateTokenPage"));
+const TradePage = lazy(() => import("./pages/TradePage"));
+const EarnPage = lazy(() => import("./pages/EarnPage"));
+import { NetworkRouteGuard } from "./config/FeatureGuards";
 
 const RouteFallback = () => (
   <div className="container mx-auto min-h-[60vh] max-w-screen-2xl px-4 py-8">
@@ -80,10 +84,26 @@ const App = () => {
           }
         />
         <Route
-          path="futures"
+          path="swap"
           element={
             <Suspense fallback={<RouteFallback />}>
-              <FuturesPage />
+              <SwapPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="trade/:pairId"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <TradePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="create"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <CreateTokenPage />
             </Suspense>
           }
         />
@@ -98,9 +118,22 @@ const App = () => {
         <Route
           path="faucet"
           element={
-            <Suspense fallback={<RouteFallback />}>
-              <FaucetPage />
-            </Suspense>
+            <NetworkRouteGuard feature="faucet">
+              <Suspense fallback={<RouteFallback />}>
+                <FaucetPage />
+              </Suspense>
+            </NetworkRouteGuard>
+          }
+        />
+        <Route path="bridge" element={<Navigate to="/portfolio" replace />} />
+        <Route
+          path="earn"
+          element={
+            <NetworkRouteGuard feature="earn">
+              <Suspense fallback={<RouteFallback />}>
+                <EarnPage />
+              </Suspense>
+            </NetworkRouteGuard>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

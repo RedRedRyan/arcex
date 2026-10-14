@@ -1,4 +1,7 @@
+import { useAccount, useSwitchChain } from "wagmi";
 import { useSearchParams } from "react-router-dom";
+import { useNetwork } from "../config/NetworkProvider";
+import { NETWORKS } from "../config/networks";
 import PriceChart from "../components/PriceChart";
 import SpotTicket from "../components/SpotTicket";
 import PairSelect from "@/components/PairSelect";
@@ -21,6 +24,44 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 );
 
 const SpotPage = () => {
+  const { network } = useNetwork();
+  const { isConnected } = useAccount();
+  const { switchChain, isPending, error } = useSwitchChain();
+
+  if (network !== "mainnet") {
+    return (
+      <div className="container mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-4 px-4 text-center">
+        <h1 className="display text-2xl font-bold" style={{ color: "var(--ink)" }}>
+          Spot trading is on Arc Mainnet
+        </h1>
+        <p className="text-sm" style={{ color: "var(--subtle)" }}>
+          TECHx, ENERGYx, ARCx, and their USDC pools are deployed on Arc Mainnet.
+          Switch networks to use your Mainnet balances.
+        </p>
+        {isConnected && (
+          <button
+            type="button"
+            onClick={() => switchChain({ chainId: NETWORKS.mainnet.chainId })}
+            disabled={isPending}
+            className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            style={{ background: "var(--accent)", color: "#fff" }}
+          >
+            {isPending ? "Switching..." : "Switch to Arc Mainnet"}
+          </button>
+        )}
+        {error && (
+          <p role="alert" className="text-sm" style={{ color: "var(--danger)" }}>
+            Could not switch networks: {error.message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return <SpotMarketContent />;
+};
+
+const SpotMarketContent = () => {
   // Active pair lives in the URL: /spot?pair=1
   const [params, setParams] = useSearchParams();
   const raw = Number(params.get("pair"));
@@ -89,9 +130,9 @@ const SpotPage = () => {
                 key={`spot-${pair.id}`}
                 pairId={pair.id}
                 variant="candle"
-                source="pool"
                 height="100%"
                 accentColor={pair.color}
+                seedPrice={pair.seedPrice}
               />
             </div>
           </div>

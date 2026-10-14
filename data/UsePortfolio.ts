@@ -1,150 +1,38 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import {
   createPublicClient,
+  fallback,
   http,
-  parseAbi,
   parseAbiItem,
-  type Abi,
   type Address,
   type Hex,
 } from "viem";
-import { arcTestnet } from "viem/chains";
-import {
-  ARC_TESTNET_CHAIN_ID,
-  ARC_USDC_ADDRESS,
-  BASE_TOKENS,
-  CONTRACT_ADDRESSES,
-  PAIRS,
-} from "../src/constants";
-import PerpEngineArtifact from "../contracts/contract-metadata/PerpEngine.json";
 import { usePoolFeed, type Candle } from "../data/OracleFeed";
 import { useWalletBalances } from "./MarketStore";
+import { useNetwork } from "../src/config/NetworkProvider";
+import {
+  NETWORKS,
+  type NetworkName,
+  type PairConfig,
+} from "../src/config/networks";
+import { useUsdcBalances } from "../src/hooks/useUsdcBalances";
+import {
+  useAssetBalances,
+  type AssetBalance,
+} from "../src/hooks/useAssetBalances";
 
-// ── Config ───────────────────────────────────────────────────────────────────
-const DAY = 86_400;
+const PRICE_DECIMALS = 1_000_000; // USDC, 6dp
+const TOKEN_DECIMALS = 1e18; // base tokens, 18dp
+const LOG_MIN_CHUNK = 50n;
+const LOG_CHUNK = 5_000n;
+const MAX_CHUNKS = 60;
+const MAX_BLOCK_LOOKUPS = 120;
+const CONCURRENCY = 4;
 const WINDOW_DAYS = 7;
-const LIVE_POLL_MS = 10_000;
-const LOG_CHUNK = 9_999n; // getLogs span (halves on RPC range errors)
-const LOG_MIN_CHUNK = 500n;
-const MAX_CHUNKS = 48; // hard cap on the first backfill (≈ 480k blocks)
-const CONCURRENCY = 3; // chunks scanned in parallel
-const MAX_BLOCK_LOOKUPS = 400; // cap on getBlock calls when stamping events
-const HISTORY_POINTS = 56; // points on the 7-day chart
-const PRICE_DECIMALS = 1e6; // USDC
-const TOKEN_DECIMALS = 1e18; // synthetic base tokens
-
-const client = createPublicClient({ chain: arcTestnet, transport: http() });
-const perpAbi = PerpEngineArtifact.abi as Abi;
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
-
-const SWAP_EVENT = parseAbiItem(
-  "event Swap(uint8 indexed pairId, address indexed sender, bool usdcIn, uint256 amountIn, uint256 amountOut, address indexed to)",
-);
-const TRANSFER_EVENT = parseAbiItem(
-  "event Transfer(address indexed from, address indexed to, uint256 value)",
-);
-const PERP_EVENTS = parseAbi([
-  "event PositionOpened(address indexed user, uint8 indexed pairId, bool isLong, uint256 sizeUsdc, uint256 entryPrice, uint256 margin, uint8 leverage)",
-  "event PositionClosed(address indexed user, uint8 indexed pairId, int256 pnl, uint256 exitPrice, uint256 feeCharged)",
-  "event MarginDeposited(address indexed user, uint256 amount)",
-  "event MarginWithdrawn(address indexed user, uint256 amount)",
-]);
-
-const ALL_TOKENS: Address[] = [
-  ARC_USDC_ADDRESS,
-  BASE_TOKENS[0],
-  BASE_TOKENS[1],
-  BASE_TOKENS[2],
-];
-
-// ── Types ────────────────────────────────────────────────────────────────────
-export type TxType =
-  | "buy"
-  | "sell"
-  | "long"
-  | "short"
-  | "close"
-  | "sent"
-  | "received";
-
-export interface ActivityItem {
-  id: string;
-  hash: Hex;
-  type: TxType;
-  /** Signed, display-ready amount, e.g. "+12.5 TECHx" or "$250.00" */
-  amount: string;
-  /** Secondary line, e.g. "for $31.20" or "5× TECHx" */
-  detail: string;
-  /** Unix seconds */
-  time: number;
-  /** true = green, false = red, null = neutral */
-  positive: boolean | null;
-}
-
-export interface HistoryPoint {
-  /** Unix milliseconds */
-  t: number;
-  value: number;
-}
-
-function isHistoryPoint(value: unknown): value is HistoryPoint {
-  if (typeof value !== "object" || value === null) return false;
-  const point = value as Record<string, unknown>;
-  return (
-    typeof point.t === "number" &&
-    Number.isFinite(point.t) &&
-    typeof point.value === "number" &&
-    Number.isFinite(point.value)
-  );
-}
-
-function readCachedSeries(address?: Address): HistoryPoint[] {
-  if (!address || typeof localStorage === "undefined") return [];
-  try {
-    const value: unknown = JSON.parse(
-      localStorage.getItem(`arcex-portfolio-history-v1:${address.toLowerCase()}`) ??
-        "[]",
-    );
-    return Array.isArray(value) && value.every(isHistoryPoint) ? value : [];
-  } catch (error) {
-    console.warn("Could not read cached portfolio history.", error);
-    return [];
-  }
-}
-
-function readCachedPositions(
-  address?: Address,
-): { freeMargin: number; locked: number; pnl: number } | null {
-  if (!address || typeof localStorage === "undefined") return null;
-  try {
-    const value: unknown = JSON.parse(
-      localStorage.getItem(
-        `arcex-portfolio-positions-v1:${address.toLowerCase()}`,
-      ) ?? "null",
-    );
-    if (typeof value !== "object" || value === null) return null;
-    const snapshot = value as Record<string, unknown>;
-    if (
-      typeof snapshot.freeMargin !== "number" ||
-      typeof snapshot.locked !== "number" ||
-      typeof snapshot.pnl !== "number" ||
-      !Number.isFinite(snapshot.freeMargin) ||
-      !Number.isFinite(snapshot.locked) ||
-      !Number.isFinite(snapshot.pnl)
-    )
-      return null;
-    return {
-      freeMargin: snapshot.freeMargin,
-      locked: snapshot.locked,
-      pnl: snapshot.pnl,
-    };
-  } catch (error) {
-    console.warn("Could not read cached portfolio margin.", error);
-    return null;
-  }
-}
+const HISTORY_POINTS = 60;
+const DAY = 86_400;
 
 export interface AssetHolding {
   pairId: number;
@@ -159,87 +47,224 @@ export interface AssetHolding {
   sparkKey: string;
 }
 
-interface Meta {
+export interface ActivityItem {
+  id: string;
   hash: Hex;
-  block: bigint;
-  idx: number;
+  time: number | null;
+  type: "buy" | "sell" | "received" | "sent";
+  amount: string;
+  detail: string;
+  positive: boolean;
 }
 
-type Raw = Meta &
-  (
-    | {
-        k: "swap";
-        pairId: number;
-        usdcIn: boolean;
-        amountIn: bigint;
-        amountOut: bigint;
-      }
-    | {
-        k: "open";
-        pairId: number;
-        isLong: boolean;
-        size: bigint;
-        leverage: number;
-      }
-    | { k: "close"; pairId: number; pnl: bigint; fee: bigint }
-    | { k: "deposit"; amount: bigint }
-    | { k: "withdraw"; amount: bigint }
-    | { k: "transfer"; token: Address; incoming: boolean; value: bigint }
+export interface HistoryPoint {
+  t: number;
+  value: number;
+}
+
+/** A real mainnet asset, valued with the price feed. */
+export interface MainnetAssetRow {
+  key: string;
+  symbol: string;
+  name: string;
+  chainId: number;
+  balance: number;
+  decimals: number;
+  /** USD price, or null when prices are unavailable (balance still shows). */
+  priceUsd: number | null;
+  changePct24h: number | null;
+  /** USD value, or null when the price is unknown. */
+  valueUsd: number | null;
+  status: "success" | "error";
+}
+
+/** A USDC balance for one chain. */
+export interface UsdcChainRow {
+  chainId: number;
+  label: string;
+  balance: number;
+  status: "idle" | "loading" | "success" | "error";
+}
+
+// ── Per-network on-chain context ─────────────────────────────────────────────
+// No hardcoded chain, RPC, address, or pair list: everything is read from
+// config/networks.ts for the ACTIVE network, so testnet and mainnet data can
+// never be mixed.
+
+interface ChainCtx {
+  network: NetworkName;
+  /** Public client bound to the active network. */
+  client: ReturnType<typeof createPublicClient>;
+  /** USDC ERC-20 address on the active network. */
+  usdcAddress: Address;
+  /** Tracked spot-pair tokens, by pair id. */
+  baseTokens: Address[];
+  /** Spot pool contract. ZERO on networks where it is not deployed. */
+  spotPool: Address;
+  /** Synthetic pairs on the active network. */
+  pairs: PairConfig[];
+  /** True when this network has configured spot pairs. */
+  hasSynthetics: boolean;
+  /** viem chain id of the active network. */
+  chainId: number;
+  /** Native USDC decimals on this network (Arc = 18). */
+  nativeDecimals: number;
+  /** ERC-20 USDC decimals on this network (Arc = 6). */
+  erc20UsdcDecimals: number;
+}
+
+/** Clients cached per network so a switch reuses rather than rebuilds. */
+const clientCache = new Map<NetworkName, ReturnType<typeof createPublicClient>>();
+
+function clientForNetwork(network: NetworkName) {
+  const cached = clientCache.get(network);
+  if (cached) return cached;
+
+  const cfg = NETWORKS[network];
+  const transports = cfg.rpcUrls.map((url) =>
+    http(url, { batch: { wait: 20, batchSize: 100 } }),
   );
-
-type TimedRaw = Raw & { time: number };
-
-interface ActivityData {
-  events: TimedRaw[]; // newest first
-  coverageStart: number; // unix seconds — how far back the scan reached
+  const client = createPublicClient({
+    chain: cfg.chain,
+    transport: transports.length > 1 ? fallback(transports) : transports[0],
+  });
+  clientCache.set(network, client);
+  return client;
 }
+
+const ZERO: Address = "0x0000000000000000000000000000000000000000";
+
+/** Resolves every chain-specific value for the active network. */
+function useChainCtx(networkOverride?: NetworkName): ChainCtx {
+  const active = useNetwork();
+  const network = networkOverride ?? active.network;
+  const config = network === active.network ? active.config : NETWORKS[network];
+
+  return useMemo<ChainCtx>(() => {
+    const pairs = config.pairs;
+    return {
+      network,
+      client: clientForNetwork(network),
+      usdcAddress: config.usdcAddress,
+      baseTokens: pairs.map((p) => p.baseToken),
+      spotPool: config.contracts.spotPool,
+      pairs,
+      hasSynthetics: pairs.length > 0,
+      chainId: config.chain.id,
+      nativeDecimals: config.nativeDecimals,
+      erc20UsdcDecimals: config.usdcDecimals,
+    };
+  }, [network, config]);
+}
+
+const SWAP_EVENT = parseAbiItem(
+  "event Swap(uint8 indexed pairId, address indexed sender, bool usdcIn, uint256 amountIn, uint256 amountOut, address indexed to)",
+);
+const TRANSFER_EVENT = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
+);
+
+// ── Tiny helpers ─────────────────────────────────────────────────────────────
+const fmtUsd = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const fmtNum = (n: number) =>
+  n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+
+type TimestampedLog = {
+  blockNumber: bigint;
+  blockHash: Hex;
+  transactionHash: Hex;
+  logIndex: number;
+  args?: unknown;
+};
+
+function metaOf(
+  log: TimestampedLog,
+): { hash: Hex; idx: number; block: bigint } | null {
+  if (typeof log.logIndex !== "number") return null;
+  return {
+    hash: log.transactionHash,
+    idx: log.logIndex,
+    block: log.blockNumber,
+  };
+}
+
+type Raw =
+  | {
+      k: "swap";
+      hash: Hex;
+      idx: number;
+      block: bigint;
+      pairId: number;
+      usdcIn: boolean;
+      amountIn: bigint;
+      amountOut: bigint;
+    }
+  | {
+      k: "transfer";
+      hash: Hex;
+      idx: number;
+      block: bigint;
+      token: Address;
+      value: bigint;
+      incoming: boolean;
+    };
+
+type TimedRaw = Raw & { time: number | null };
 
 interface Store {
   events: Map<string, Raw>;
-  times: Map<bigint, number>;
+  times: Map<string, number>;
   scannedTo: bigint;
   coverageStart: number;
 }
 
-// ── On-chain activity scan ───────────────────────────────────────────────────
-const metaOf = (l: {
-  transactionHash: Hex | null;
-  blockNumber: bigint | null;
-  logIndex: number | null;
-}): Meta | null =>
-  l.transactionHash && l.blockNumber !== null && l.logIndex !== null
-    ? { hash: l.transactionHash, block: l.blockNumber, idx: l.logIndex }
-    : null;
+interface ActivityData {
+  events: TimedRaw[];
+  coverageStart: number;
+}
 
+// ── Event scanning ───────────────────────────────────────────────────────────
 async function fetchLogs(
+  ctx: ChainCtx,
   user: Address,
   fromBlock: bigint,
   toBlock: bigint,
 ): Promise<Raw[]> {
-  const me = user.toLowerCase();
-  const [swaps, perp, out, inc] = await Promise.all([
-    client.getLogs({
-      address: CONTRACT_ADDRESSES.spotPool,
-      event: SWAP_EVENT,
-      args: { sender: user },
-      fromBlock,
-      toBlock,
-    }),
-    client.getLogs({
-      address: CONTRACT_ADDRESSES.perpEngine,
-      events: PERP_EVENTS,
-      fromBlock,
-      toBlock,
-    }),
-    client.getLogs({
-      address: ALL_TOKENS,
+  // No spot pool on this network -> no swaps to scan.
+  const swapTargets =
+    ctx.spotPool === ZERO || !ctx.hasSynthetics
+      ? []
+      : [
+          ctx.client.getLogs({
+            address: ctx.spotPool,
+            event: SWAP_EVENT,
+            args: { sender: user },
+            fromBlock,
+            toBlock,
+          }),
+        ];
+
+  // Track USDC and configured spot-token transfers alongside spot swaps.
+  const transferTargets: Address[] = [ctx.usdcAddress, ...ctx.baseTokens];
+
+  const [swapLists, out, inc] = await Promise.all([
+    Promise.all(swapTargets),
+    ctx.client.getLogs({
+      address: transferTargets,
       event: TRANSFER_EVENT,
       args: { from: user },
       fromBlock,
       toBlock,
     }),
-    client.getLogs({
-      address: ALL_TOKENS,
+    ctx.client.getLogs({
+      address: transferTargets,
       event: TRANSFER_EVENT,
       args: { to: user },
       fromBlock,
@@ -249,82 +274,49 @@ async function fetchLogs(
 
   const result: Raw[] = [];
 
-  for (const l of swaps) {
-    const m = metaOf(l);
-    if (!m) continue;
-    const a = l.args as {
-      pairId: number;
-      usdcIn: boolean;
-      amountIn: bigint;
-      amountOut: bigint;
-    };
-    result.push({
-      ...m,
-      k: "swap",
-      pairId: Number(a.pairId),
-      usdcIn: a.usdcIn,
-      amountIn: a.amountIn,
-      amountOut: a.amountOut,
-    });
-  }
-
-  for (const l of perp) {
-    const m = metaOf(l);
-    if (!m) continue;
-    const a = l.args as Record<string, unknown>;
-    if (String(a.user).toLowerCase() !== me) continue;
-    switch (l.eventName) {
-      case "PositionOpened":
-        result.push({
-          ...m,
-          k: "open",
-          pairId: Number(a.pairId),
-          isLong: a.isLong as boolean,
-          size: a.sizeUsdc as bigint,
-          leverage: Number(a.leverage),
-        });
-        break;
-      case "PositionClosed":
-        result.push({
-          ...m,
-          k: "close",
-          pairId: Number(a.pairId),
-          pnl: a.pnl as bigint,
-          fee: a.feeCharged as bigint,
-        });
-        break;
-      case "MarginDeposited":
-        result.push({ ...m, k: "deposit", amount: a.amount as bigint });
-        break;
-      case "MarginWithdrawn":
-        result.push({ ...m, k: "withdraw", amount: a.amount as bigint });
-        break;
+  for (const swaps of swapLists) {
+    for (const l of swaps) {
+      const m = metaOf(l);
+      if (!m) continue;
+      const a = l.args as {
+        pairId: number;
+        usdcIn: boolean;
+        amountIn: bigint;
+        amountOut: bigint;
+      };
+      result.push({
+        ...m,
+        k: "swap",
+        pairId: Number(a.pairId),
+        usdcIn: a.usdcIn,
+        amountIn: a.amountIn,
+        amountOut: a.amountOut,
+      });
     }
   }
 
   for (const l of out) {
     const m = metaOf(l);
     if (!m) continue;
-    const a = l.args as { from: Address; to: Address; value: bigint };
-    if (a.to.toLowerCase() === me) continue; // self-transfer — counted once below
+    const a = l.args as { value: bigint };
     result.push({
       ...m,
       k: "transfer",
       token: l.address,
-      incoming: false,
       value: a.value,
+      incoming: false,
     });
   }
   for (const l of inc) {
     const m = metaOf(l);
     if (!m) continue;
-    const a = l.args as { from: Address; to: Address; value: bigint };
+    const a = l.args as { value: bigint };
     result.push({
       ...m,
       k: "transfer",
       token: l.address,
-      incoming: true,
       value: a.value,
+      incoming: true,
     });
   }
 
@@ -333,58 +325,89 @@ async function fetchLogs(
 
 /** Fetches one block range, halving the span if the RPC rejects it. */
 async function fetchRange(
+  ctx: ChainCtx,
   user: Address,
   from: bigint,
   to: bigint,
 ): Promise<Raw[]> {
   try {
-    return await fetchLogs(user, from, to);
+    return await fetchLogs(ctx, user, from, to);
   } catch (err) {
     if (to - from + 1n <= LOG_MIN_CHUNK) throw err;
     const mid = from + (to - from) / 2n;
-    const left = await fetchRange(user, from, mid);
-    const right = await fetchRange(user, mid + 1n, to);
+    const left = await fetchRange(ctx, user, from, mid);
+    const right = await fetchRange(ctx, user, mid + 1n, to);
     return [...left, ...right];
   }
 }
 
-const eventKey = (e: Meta) => `${e.hash}-${e.idx}`;
-const stores = new Map<string, Store>();
-const activityStorageKey = (user: Address) =>
-  `arcex-portfolio-activity-v1:${user.toLowerCase()}`;
+// ── Cache (namespaced by network) ────────────────────────────────────────────
+function readCachedSeries(
+  network: NetworkName,
+  address?: Address,
+): HistoryPoint[] {
+  if (!address || typeof localStorage === "undefined") return [];
+  try {
+    const value: unknown = JSON.parse(
+      localStorage.getItem(
+        `arcex-portfolio-history-v1:${network}:${address.toLowerCase()}`,
+      ) ?? "[]",
+    );
+    return Array.isArray(value) && value.every(isHistoryPoint) ? value : [];
+  } catch (error) {
+    console.warn("Could not read cached portfolio history.", error);
+    return [];
+  }
+}
 
-function readActivityStore(user: Address): Store | null {
+const eventKey = (e: { hash: Hex; idx: number }) => `${e.hash}-${e.idx}`;
+const stores = new Map<string, Store>();
+const activityStorageKey = (network: NetworkName, user: Address) =>
+  `arcex-portfolio-activity-v1:${network}:${user.toLowerCase()}`;
+
+/** Shape of the persisted activity store. */
+interface PersistedActivity {
+  events: Array<[string, Raw]>;
+  times: Array<[string, number]>;
+  scannedTo: string;
+  coverageStart: number;
+}
+
+function readActivityStore(
+  network: NetworkName,
+  user: Address,
+): Store | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(activityStorageKey(user));
+    const raw = localStorage.getItem(activityStorageKey(network, user));
     if (!raw) return null;
     const value = JSON.parse(raw, (_key, entry: unknown) => {
-      if (
-        typeof entry === "object" &&
-        entry !== null &&
-        "__bigint" in entry &&
-        typeof entry.__bigint === "string"
-      )
-        return BigInt(entry.__bigint);
+      if (entry && typeof entry === "object" && "_tag" in entry) {
+        const tagged = entry as Record<string, unknown>;
+        if (String(tagged._tag).endsWith("(bigint)")) {
+          return BigInt(String(tagged.hex));
+        }
+      }
       return entry;
-    }) as {
-      events?: [string, Raw][];
-      times?: [string, number][];
-      scannedTo?: string;
-      coverageStart?: number;
-    };
+    });
+
+    // Validate the revived shape before trusting it.
+    const parsed = value as Partial<PersistedActivity> | null;
     if (
-      !Array.isArray(value.events) ||
-      !Array.isArray(value.times) ||
-      typeof value.scannedTo !== "string" ||
-      typeof value.coverageStart !== "number"
-    )
+      !parsed ||
+      !Array.isArray(parsed.events) ||
+      !Array.isArray(parsed.times) ||
+      typeof parsed.scannedTo !== "string" ||
+      typeof parsed.coverageStart !== "number"
+    ) {
       return null;
+    }
+
     return {
-      events: new Map(value.events),
-      times: new Map(value.times.map(([block, time]) => [BigInt(block), time])),
-      scannedTo: BigInt(value.scannedTo),
-      coverageStart: value.coverageStart,
+      events: new Map<string, Raw>(parsed.events),
+      times: new Map<string, number>(parsed.times),
+      scannedTo: BigInt(parsed.scannedTo),
+      coverageStart: parsed.coverageStart,
     };
   } catch (error) {
     console.warn("Could not read cached portfolio activity.", error);
@@ -392,45 +415,53 @@ function readActivityStore(user: Address): Store | null {
   }
 }
 
-function persistActivityStore(user: Address, store: Store) {
+function persistActivityStore(
+  network: NetworkName,
+  user: Address,
+  store: Store,
+) {
   if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(
-      activityStorageKey(user),
+      activityStorageKey(network, user),
       JSON.stringify(
         {
           events: [...store.events.entries()],
-          times: [...store.times.entries()].map(([block, time]) => [
-            block.toString(),
-            time,
-          ]),
-          scannedTo: store.scannedTo.toString(),
+          times: [...store.times.entries()],
+          scannedTo: store.scannedTo,
           coverageStart: store.coverageStart,
         },
-        (_key, value: unknown) =>
-          typeof value === "bigint" ? { __bigint: value.toString() } : value,
+        (_key, value: unknown) => {
+          if (typeof value === "bigint")
+            return { _tag: "BigInt(bigint)", hex: value.toString(16) };
+          return value;
+        },
       ),
     );
   } catch (error) {
-    console.warn("Could not cache portfolio activity.", error);
+    console.warn("Could not persist portfolio activity.", error);
   }
 }
 
-async function blockTimestamp(blockNumber: bigint): Promise<number> {
-  const b = await client.getBlock({ blockNumber });
+// ── Block timestamps ─────────────────────────────────────────────────────────
+async function blockTimestamp(
+  ctx: ChainCtx,
+  blockNumber: bigint,
+): Promise<number> {
+  const b = await ctx.client.getBlock({ blockNumber });
   return Number(b.timestamp);
 }
 
-async function stampBlocks(store: Store) {
+async function stampBlocks(ctx: ChainCtx, store: Store) {
   const missing = [...new Set([...store.events.values()].map((e) => e.block))]
-    .filter((b) => !store.times.has(b))
+    .filter((b) => !store.times.has(b.toString()))
     .sort((a, b) => (a > b ? -1 : a < b ? 1 : 0))
     .slice(0, MAX_BLOCK_LOOKUPS);
   for (let i = 0; i < missing.length; i += 8) {
     await Promise.all(
       missing.slice(i, i + 8).map(async (bn) => {
         try {
-          store.times.set(bn, await blockTimestamp(bn));
+          store.times.set(bn.toString(), await blockTimestamp(ctx, bn));
         } catch {
           // leave unstamped; the event is skipped this round
         }
@@ -443,12 +474,17 @@ async function stampBlocks(store: Store) {
  * First call backfills ~7 days backwards; later calls only scan the blocks
  * produced since the previous run, so polling stays cheap.
  */
-async function syncActivity(user: Address): Promise<ActivityData> {
-  const key = user.toLowerCase();
-  const latest = await client.getBlockNumber();
+async function syncActivity(
+  ctx: ChainCtx,
+  user: Address,
+): Promise<ActivityData> {
+  // Store keys are network-scoped so testnet and mainnet never share a scan.
+  const key = `${ctx.network}:${user.toLowerCase()}`;
+  const latest = await ctx.client.getBlockNumber();
   const cutoff = Math.floor(Date.now() / 1000) - WINDOW_DAYS * DAY;
 
-  let store = stores.get(key) ?? readActivityStore(user) ?? undefined;
+  let store =
+    stores.get(key) ?? readActivityStore(ctx.network, user) ?? undefined;
 
   if (!store) {
     const events = new Map<string, Raw>();
@@ -465,13 +501,13 @@ async function syncActivity(user: Address): Promise<ActivityData> {
     for (let i = 0; i < ranges.length; i += CONCURRENCY) {
       const batch = ranges.slice(i, i + CONCURRENCY);
       const results = await Promise.all(
-        batch.map(([f, t]) => fetchRange(user, f, t)),
+        batch.map(([f, t]) => fetchRange(ctx, user, f, t)),
       );
       for (const list of results)
         for (const ev of list) events.set(eventKey(ev), ev);
 
       const oldest = batch[batch.length - 1][0];
-      coverageStart = await blockTimestamp(oldest);
+      coverageStart = await blockTimestamp(ctx, oldest);
       if (coverageStart <= cutoff || oldest === 0n) break;
     }
 
@@ -480,57 +516,46 @@ async function syncActivity(user: Address): Promise<ActivityData> {
   } else if (latest > store.scannedTo) {
     let from = store.scannedTo + 1n;
     while (from <= latest) {
-      const end =
-        from + LOG_CHUNK - 1n < latest ? from + LOG_CHUNK - 1n : latest;
-      for (const ev of await fetchRange(user, from, end))
+      const end = from + LOG_CHUNK - 1n < latest ? from + LOG_CHUNK - 1n : latest;
+      for (const ev of await fetchRange(ctx, user, from, end))
         store.events.set(eventKey(ev), ev);
       from = end + 1n;
     }
     store.scannedTo = latest;
   }
 
-  await stampBlocks(store);
+  await stampBlocks(ctx, store);
   stores.set(key, store);
-  persistActivityStore(user, store);
+  persistActivityStore(ctx.network, user, store);
 
   const events: TimedRaw[] = [];
   for (const ev of store.events.values()) {
-    const time = store.times.get(ev.block);
-    if (time !== undefined) events.push({ ...ev, time });
+    const t = store.times.get(ev.block.toString());
+    if (t === undefined) continue;
+    events.push({ ...ev, time: t });
   }
-  events.sort((a, b) =>
-    a.block === b.block ? b.idx - a.idx : a.block > b.block ? -1 : 1,
-  );
+  events.sort((a, b) => (b.time ?? 0) - (a.time ?? 0));
 
   return { events, coverageStart: store.coverageStart };
 }
 
 // ── Formatting ───────────────────────────────────────────────────────────────
-const fmtNum = (n: number, max = 4) =>
-  n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: max,
-  });
-
-const fmtUsd = (n: number) =>
-  n.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-function tokenLabel(token: Address): { symbol: string; decimals: number } {
+function tokenLabel(
+  ctx: ChainCtx,
+  token: Address,
+): { symbol: string; decimals: number } {
   const t = token.toLowerCase();
-  if (t === ARC_USDC_ADDRESS.toLowerCase())
-    return { symbol: "USDC", decimals: PRICE_DECIMALS };
-  for (const id of [0, 1, 2]) {
-    if (BASE_TOKENS[id].toLowerCase() === t)
-      return { symbol: PAIRS[id].ticker, decimals: TOKEN_DECIMALS };
+  if (t === ctx.usdcAddress.toLowerCase())
+    return { symbol: "USDC", decimals: ctx.erc20UsdcDecimals };
+  for (const [id, addr] of ctx.baseTokens.entries()) {
+    if (addr.toLowerCase() === t)
+      return { symbol: ctx.pairs[id]?.ticker ?? "TOKEN", decimals: 18 };
   }
-  return { symbol: "TOKEN", decimals: TOKEN_DECIMALS };
+  return { symbol: "TOKEN", decimals: 18 };
 }
 
-function toActivity(events: TimedRaw[]): ActivityItem[] {
-  // A transfer that belongs to a swap / margin / position tx is already described by that event.
+function toActivity(ctx: ChainCtx, events: TimedRaw[]): ActivityItem[] {
+  // A transfer that belongs to a swap tx is already described by that event.
   const protocolTx = new Set(
     events.filter((e) => e.k !== "transfer").map((e) => e.hash),
   );
@@ -540,7 +565,7 @@ function toActivity(events: TimedRaw[]): ActivityItem[] {
     const base = { id: eventKey(ev), hash: ev.hash, time: ev.time };
     switch (ev.k) {
       case "swap": {
-        const ticker = PAIRS[ev.pairId as 0 | 1 | 2]?.ticker ?? "TOKEN";
+        const ticker = ctx.pairs[ev.pairId]?.ticker ?? "TOKEN";
         if (ev.usdcIn) {
           const qty = Number(ev.amountOut) / TOKEN_DECIMALS;
           const usd = Number(ev.amountIn) / PRICE_DECIMALS;
@@ -564,50 +589,9 @@ function toActivity(events: TimedRaw[]): ActivityItem[] {
         }
         break;
       }
-      case "open": {
-        const ticker = PAIRS[ev.pairId as 0 | 1 | 2]?.ticker ?? "TOKEN";
-        items.push({
-          ...base,
-          type: ev.isLong ? "long" : "short",
-          amount: `$${fmtUsd(Number(ev.size) / PRICE_DECIMALS)}`,
-          detail: `${ev.leverage}× ${ticker}`,
-          positive: ev.isLong,
-        });
-        break;
-      }
-      case "close": {
-        const ticker = PAIRS[ev.pairId as 0 | 1 | 2]?.ticker ?? "TOKEN";
-        const pnl = Number(ev.pnl) / PRICE_DECIMALS;
-        items.push({
-          ...base,
-          type: "close",
-          amount: `${pnl >= 0 ? "+" : "−"}$${fmtUsd(Math.abs(pnl))}`,
-          detail: `Closed ${ticker}`,
-          positive: pnl >= 0,
-        });
-        break;
-      }
-      case "deposit":
-        items.push({
-          ...base,
-          type: "sent",
-          amount: `−$${fmtUsd(Number(ev.amount) / PRICE_DECIMALS)}`,
-          detail: "USDC → margin",
-          positive: false,
-        });
-        break;
-      case "withdraw":
-        items.push({
-          ...base,
-          type: "received",
-          amount: `+$${fmtUsd(Number(ev.amount) / PRICE_DECIMALS)}`,
-          detail: "USDC ← margin",
-          positive: true,
-        });
-        break;
       case "transfer": {
         if (protocolTx.has(ev.hash)) break;
-        const { symbol, decimals } = tokenLabel(ev.token);
+        const { symbol, decimals } = tokenLabel(ctx, ev.token);
         const qty = Number(ev.value) / decimals;
         items.push({
           ...base,
@@ -623,27 +607,25 @@ function toActivity(events: TimedRaw[]): ActivityItem[] {
   return items;
 }
 
-// ── 7-day balance reconstruction ─────────────────────────────────────────────
+// ── 7-day balance reconstruction (testnet only) ──────────────────────────────
 interface Snapshot {
   usdc: number;
   tokens: [number, number, number];
-  /** Free margin + margin locked in open positions (excludes unrealized PnL) */
-  margin: number;
 }
 
 /** Index of a token in `tokens`, -1 for USDC, -2 for anything else. */
-function tokenIndex(token: Address): number {
+function tokenIndex(ctx: ChainCtx, token: Address): number {
   const t = token.toLowerCase();
-  if (t === ARC_USDC_ADDRESS.toLowerCase()) return -1;
-  for (const id of [0, 1, 2])
-    if (BASE_TOKENS[id].toLowerCase() === t) return id;
+  if (t === ctx.usdcAddress.toLowerCase()) return -1;
+  for (const [id, addr] of ctx.baseTokens.entries())
+    if (addr.toLowerCase() === t) return id;
   return -2;
 }
 
-function undoEvent(s: Snapshot, ev: TimedRaw) {
+function undoEvent(ctx: ChainCtx, s: Snapshot, ev: TimedRaw) {
   switch (ev.k) {
     case "transfer": {
-      const idx = tokenIndex(ev.token);
+      const idx = tokenIndex(ctx, ev.token);
       if (idx === -2) return;
       const amount =
         Number(ev.value) / (idx === -1 ? PRICE_DECIMALS : TOKEN_DECIMALS);
@@ -652,18 +634,7 @@ function undoEvent(s: Snapshot, ev: TimedRaw) {
       else s.tokens[idx] += delta;
       return;
     }
-    case "deposit":
-      s.margin -= Number(ev.amount) / PRICE_DECIMALS;
-      return;
-    case "withdraw":
-      s.margin += Number(ev.amount) / PRICE_DECIMALS;
-      return;
-    case "close":
-      // Close credits margin + pnl − fee back to the account
-      s.margin -= (Number(ev.pnl) - Number(ev.fee)) / PRICE_DECIMALS;
-      return;
     default:
-      return; // swaps are covered by their token transfers; opens only move free → locked margin
   }
 }
 
@@ -681,7 +652,7 @@ function makePriceAt(
     const base = ev.usdcIn ? Number(ev.amountOut) : Number(ev.amountIn);
     if (base > 0)
       obs[ev.pairId].push([
-        ev.time,
+        ev.time ?? 0,
         usdc / PRICE_DECIMALS / (base / TOKEN_DECIMALS),
       ]);
   }
@@ -701,13 +672,17 @@ function makePriceAt(
       if (arr[mid][0] <= t) {
         found = mid;
         lo = mid + 1;
-      } else hi = mid - 1;
+      } else {
+        hi = mid - 1;
+      }
     }
-    return found === -1 ? arr[0][1] : arr[found][1];
+    if (found === -1) return fallback[pairId] ?? 0;
+    return arr[found][1];
   };
 }
 
 function buildSeries(
+  ctx: ChainCtx,
   events: TimedRaw[],
   coverageStart: number,
   live: Snapshot & { netWorth: number },
@@ -719,25 +694,21 @@ function buildSeries(
 
   const state: Snapshot = {
     usdc: live.usdc,
-    tokens: [...live.tokens],
-    margin: live.margin,
+    tokens: [...live.tokens] as [number, number, number],
   };
   const points: HistoryPoint[] = [];
   let cursor = 0;
 
   for (let ts = now - step; ts >= start; ts -= step) {
-    while (cursor < events.length && events[cursor].time > ts) {
-      undoEvent(state, events[cursor]);
+    while (cursor < events.length && (events[cursor].time ?? 0) > ts) {
+      undoEvent(ctx, state, events[cursor]);
       cursor++;
     }
     const spot = state.tokens.reduce(
       (sum, qty, i) => sum + qty * priceAt(i, ts),
       0,
     );
-    points.push({
-      t: ts * 1000,
-      value: Math.max(0, state.usdc + state.margin + spot),
-    });
+    points.push({ t: ts * 1000, value: Math.max(0, state.usdc + spot) });
   }
 
   points.reverse();
@@ -745,8 +716,8 @@ function buildSeries(
   return points;
 }
 
-/** Keeps the last non-null value; resets when the wallet address changes.
- *  Intentional render-phase ref mutation: this helper IS the cache. */
+/** Keeps the last non-null value; resets when the key changes.
+ *  The key includes the network, so switching networks drops the cache. */
 function useLastGood<T>(key: string | undefined, next: T | null): T | null {
   const ref = useRef<{ key: string | undefined; value: T | null }>({
     key,
@@ -761,221 +732,269 @@ function useLastGood<T>(key: string | undefined, next: T | null): T | null {
 }
 
 // ── Public hook ──────────────────────────────────────────────────────────────
-export function usePortfolio() {
+export interface PortfolioResult {
+  network: NetworkName;
+  isMainnet: boolean;
+  address: Address | undefined;
+  isConnected: boolean;
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+
+  /** Total portfolio value in USD, per the active network's rules. */
+  netWorth: number;
+
+  /** Testnet: USDC on the connected chain. Mainnet: total across 3 chains. */
+  usdcTotal: number;
+  /** Mainnet only: per-chain USDC rows. Empty on testnet. */
+  usdcByChain: UsdcChainRow[];
+
+  /** Testnet synthetic holdings. Empty on Mainnet. */
+  assets: AssetHolding[];
+  /** Mainnet only: real asset rows with USD values. Empty on testnet. */
+  mainnetAssets: MainnetAssetRow[];
+  /** True when the price source is unavailable (balances still show). */
+  pricesUnavailable: boolean;
+
+  /** Testnet only: 7-day history. Empty on mainnet. */
+  series: HistoryPoint[];
+  changeAbs: number;
+  changePct: number | null;
+
+  /** Recent activity for the active network. */
+  recent: ActivityItem[];
+  activityLoading: boolean;
+}
+
+export function usePortfolio(): PortfolioResult {
   const { address, isConnected } = useAccount();
   const enabled = isConnected && !!address;
-  const user = address ?? ZERO_ADDRESS;
-  const walletBalances = useWalletBalances(enabled ? address : undefined);
+  const { network, config, isMainnet } = useNetwork();
+  const ctx = useChainCtx();
+  const activityCtx = useChainCtx("mainnet");
 
-  const positions = useReadContracts({
-    contracts: [
-      {
-        address: CONTRACT_ADDRESSES.perpEngine,
-        abi: perpAbi,
-        functionName: "marginAccounts",
-        args: [user],
-        chainId: ARC_TESTNET_CHAIN_ID,
-      },
-      ...[0, 1, 2].flatMap((id) => [
-        {
-          address: CONTRACT_ADDRESSES.perpEngine,
-          abi: perpAbi,
-          functionName: "positions",
-          args: [user, id],
-          chainId: ARC_TESTNET_CHAIN_ID,
-        },
-        {
-          address: CONTRACT_ADDRESSES.perpEngine,
-          abi: perpAbi,
-          functionName: "getUnrealizedPnl",
-          args: [user, id],
-          chainId: ARC_TESTNET_CHAIN_ID,
-        },
-      ]),
-    ] as never,
-    query: {
-      enabled,
-      refetchInterval: LIVE_POLL_MS,
-      refetchOnWindowFocus: false,
-    },
-  });
+  // ── Testnet path ──────────────────────────────────────────────────────────
+  const walletBalances = useWalletBalances(
+    enabled && !isMainnet ? address : undefined,
+  );
 
-  type BalanceSnap = {
-    usdc: number;
-    balances: [number, number, number];
-  };
-  type PosSnap = { freeMargin: number; locked: number; pnl: number };
-  type Res = { status: string; result?: unknown };
+  type BalanceSnap = { usdc: number; balances: [number, number, number] };
 
   const balanceNext = useMemo<BalanceSnap | null>(
     () =>
-      walletBalances
+      walletBalances && !isMainnet
         ? { usdc: walletBalances.usdc, balances: walletBalances.tokens }
         : null,
-    [walletBalances],
+    [walletBalances, isMainnet],
   );
 
-  const posNext = useMemo<PosSnap | null>(() => {
-    const r = positions.data as Res[] | undefined;
-    if (!r || r.length !== 7 || r[0].status !== "success") return null;
-    let locked = 0;
-    let pnl = 0;
-    const freeMargin = Number(r[0].result) / PRICE_DECIMALS;
-    for (const id of [0, 1, 2]) {
-      const pos = r[1 + id * 2];
-      if (pos.status !== "success") return null;
-      const row = pos.result as readonly unknown[];
-      if (!Array.isArray(row) || !row[8]) continue; // index 8 = isOpen
-      const pnlRes = r[2 + id * 2];
-      if (pnlRes.status !== "success") return null; // open position, PnL unknown → keep last good
-      locked += Number(row[4] as bigint) / PRICE_DECIMALS;
-      pnl += Number(pnlRes.result) / PRICE_DECIMALS;
-    }
-    return { freeMargin, locked, pnl };
-  }, [positions.data]);
+  // Cache key is network-scoped, so a switch resets instead of leaking.
+  const cacheKey = enabled ? `${network}:${address?.toLowerCase()}` : undefined;
+  const balanceSnap = useLastGood(cacheKey, balanceNext);
 
-  // Last-known-good snapshots (reset when the wallet changes)
-  const balanceSnap = useLastGood(address, balanceNext);
-  const latestPosSnap = useLastGood(address, posNext);
-  const cachedPosSnap = useMemo(() => readCachedPositions(address), [address]);
-  const posSnap = latestPosSnap ?? cachedPosSnap;
-  useEffect(() => {
-    if (!address || !latestPosSnap) return;
-    try {
-      localStorage.setItem(
-        `arcex-portfolio-positions-v1:${address.toLowerCase()}`,
-        JSON.stringify(latestPosSnap),
-      );
-    } catch (error) {
-      console.warn("Could not cache portfolio margin.", error);
-    }
-  }, [address, latestPosSnap]);
-  const ready = enabled && balanceSnap !== null;
-
+  const testnetReady = enabled && !isMainnet && balanceSnap !== null;
   const usdc = balanceSnap?.usdc ?? 0;
   const balances =
     balanceSnap?.balances ?? ([0, 0, 0] as [number, number, number]);
-  const freeMargin = posSnap?.freeMargin ?? 0;
-  const lockedMargin = posSnap?.locked ?? 0;
-  const unrealizedPnl = posSnap?.pnl ?? 0;
 
-  // Candles / 24h change / sparkline come from the shared pool feeds (display only)
+  /** Pool feeds are testnet-only (they read the testnet spot pools). */
   const feed0 = usePoolFeed(0);
   const feed1 = usePoolFeed(1);
   const feed2 = usePoolFeed(2);
   const feeds = [feed0, feed1, feed2];
 
-  const assets: AssetHolding[] = PAIRS.map((pair, i) => {
-    const price = feeds[i].price ?? 0;
-    return {
-      pairId: pair.id,
-      ticker: pair.ticker,
-      name: pair.name,
-      color: pair.color,
-      balance: balances[i],
-      price,
-      value: balances[i] * price, // holdings × live pool price
-      changePct24h: feeds[i].changePct24h,
-      candles: feeds[i].candles,
-      sparkKey: `${feeds[i].epoch}:${feeds[i].last?.time}:${feeds[i].last?.close}`,
-    };
-  });
+  const assets: AssetHolding[] = isMainnet
+    ? []
+    : config.pairs.map((pair, i) => {
+        const price = feeds[i]?.price ?? 0;
+        return {
+          pairId: pair.id,
+          ticker: pair.ticker,
+          name: pair.name,
+          color: pair.color,
+          balance: balances[i] ?? 0,
+          price,
+          value: (balances[i] ?? 0) * price,
+          changePct24h: feeds[i]?.changePct24h ?? null,
+          candles: feeds[i]?.candles ?? [],
+          sparkKey: `${feeds[i]?.epoch}:${feeds[i]?.last?.time}:${feeds[i]?.last?.close}`,
+        };
+      });
 
   const spotValue = assets.reduce((sum, a) => sum + a.value, 0);
-  const marginValue = freeMargin + lockedMargin + unrealizedPnl;
-  const netWorth = usdc + spotValue + marginValue;
+  const testnetNetWorth = usdc + spotValue;
 
-  // On-chain activity (swaps, perps, margin, transfers) — also drives the history
+  // ── Mainnet path ──────────────────────────────────────────────────────────
+  const usdcBalances = useUsdcBalances(
+    enabled && isMainnet ? address : undefined,
+  );
+  const assetBalances = useAssetBalances(
+    enabled && isMainnet ? address : undefined,
+  );
+  const usdcRows: UsdcChainRow[] = isMainnet
+    ? usdcBalances.balances.map((c) => ({
+        chainId: c.chainId,
+        label: c.label,
+        balance: Number(c.raw ?? 0n) / 10 ** config.usdcDecimals,
+        status: c.status,
+      }))
+    : [];
+
+  const usdcMainnetTotal = usdcRows
+    .filter((r) => r.status === "success")
+    .reduce((sum, r) => sum + r.balance, 0);
+
+  const mainnetAssets: MainnetAssetRow[] = isMainnet
+    ? assetBalances.balances.map((b: AssetBalance) => {
+        const pool = feeds[b.pairId];
+        const balance = Number(b.raw) / 10 ** b.decimals;
+        const priceUsd = pool?.price ?? null;
+        return {
+          key: b.key,
+          symbol: b.symbol,
+          name: b.name,
+          chainId: b.chainId,
+          balance,
+          decimals: b.decimals,
+          priceUsd,
+          changePct24h: pool?.changePct24h ?? null,
+          valueUsd: priceUsd === null ? null : balance * priceUsd,
+          status: b.status,
+        };
+      })
+    : [];
+
+  const mainnetAssetValue = mainnetAssets.reduce(
+    (sum, a) => sum + (a.valueUsd ?? 0),
+    0,
+  );
+  const mainnetNetWorth = usdcMainnetTotal + mainnetAssetValue;
+
+  // ── Activity (network-scoped) ─────────────────────────────────────────────
   const activity = useQuery({
-    queryKey: ["portfolio-activity", address],
-    queryFn: () => syncActivity(address as Address),
+    queryKey: ["portfolio-activity", "mainnet", address ?? ""],
+    queryFn: () => syncActivity(activityCtx, address as Address),
     enabled,
-    refetchInterval: 30_000,
     staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 
+  // ── History (testnet only) ────────────────────────────────────────────────
   const balanceKey = balances.join(",");
 
-  const cachedSeries = useMemo(() => readCachedSeries(address), [address]);
+  const cachedSeries = useMemo(
+    () => readCachedSeries(network, address),
+    [network, address],
+  );
+
   const rebuiltSeries = useMemo<HistoryPoint[]>(() => {
-    if (!ready || !activity.data) return [];
+    if (isMainnet || !testnetReady || !activity.data) return [];
     const priceAt = makePriceAt(
       feeds.map((f) => f.candles),
       feeds.map((f) => f.price ?? 0),
       activity.data.events,
     );
     return buildSeries(
+      ctx,
       activity.data.events,
       activity.data.coverageStart,
-      { usdc, tokens: balances, margin: freeMargin + lockedMargin, netWorth },
+      { usdc, tokens: balances, netWorth: testnetNetWorth },
       priceAt,
     );
-    // feeds/balances are tracked through their keys; candles are mutated in place
+    // feeds/balances are tracked through their keys; candles mutate in place
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    ready,
-    activity.data,
-    usdc,
-    balanceKey,
-    freeMargin,
-    lockedMargin,
-  ]);
+  }, [isMainnet, testnetReady, activity.data, usdc, balanceKey, ctx]);
+
   const series = useMemo<HistoryPoint[]>(() => {
+    if (isMainnet) return [];
     if (rebuiltSeries.length > 0)
       return [
         ...rebuiltSeries.slice(0, -1),
-        { t: Date.now(), value: netWorth },
+        { t: Date.now(), value: testnetNetWorth },
       ];
-    if (!ready || cachedSeries.length === 0) return cachedSeries;
+    if (!testnetReady || cachedSeries.length === 0) return cachedSeries;
     return [
       ...cachedSeries.slice(0, -1),
-      { t: Date.now(), value: netWorth },
+      { t: Date.now(), value: testnetNetWorth },
     ];
-  }, [rebuiltSeries, cachedSeries, ready, netWorth]);
+  }, [isMainnet, rebuiltSeries, cachedSeries, testnetReady, testnetNetWorth]);
 
   useEffect(() => {
-    if (!address || series.length === 0) return;
+    if (isMainnet || !address || series.length === 0) return;
     try {
       localStorage.setItem(
-        `arcex-portfolio-history-v1:${address.toLowerCase()}`,
+        `arcex-portfolio-history-v1:${network}:${address.toLowerCase()}`,
         JSON.stringify(series),
       );
     } catch (error) {
       console.warn("Could not cache portfolio history.", error);
     }
-  }, [address, series]);
+  }, [network, address, series, isMainnet]);
 
   const recent = useMemo(
-    () => (activity.data ? toActivity(activity.data.events).slice(0, 5) : []),
-    [activity.data],
+    () => {
+      if (!activity.data) return [];
+      const seenTransactions = new Set<string>();
+      return toActivity(activityCtx, activity.data.events)
+        .filter((item) => {
+          const hash = item.hash.toLowerCase();
+          if (seenTransactions.has(hash)) return false;
+          seenTransactions.add(hash);
+          return true;
+        })
+        .slice(0, 5);
+    },
+    [activity.data, activityCtx],
   );
 
+  const netWorth = isMainnet ? mainnetNetWorth : testnetNetWorth;
   const first = series[0]?.value ?? 0;
   const last = series[series.length - 1]?.value ?? netWorth;
   const changeAbs = last - first;
   const changePct = first > 0 ? (changeAbs / first) * 100 : null;
 
+  const loading =
+    enabled &&
+    (isMainnet
+      ? usdcBalances.loading || assetBalances.loading
+      : (walletBalances?.updating ?? true));
+
+  const error = activity.isError
+    ? "Could not load activity."
+    : !isMainnet && enabled && !balanceSnap
+      ? "Could not load balances."
+      : null;
+
   return {
+    network,
+    isMainnet,
     address,
     isConnected,
-    ready,
+    ready: isMainnet
+      ? enabled && !usdcBalances.loading && !assetBalances.loading
+      : testnetReady,
+    loading,
+    error,
     netWorth,
-    usdc,
-    spotValue,
-    freeMargin,
-    lockedMargin,
-    unrealizedPnl,
-    marginValue,
+    usdcTotal: isMainnet ? usdcMainnetTotal : usdc,
+    usdcByChain: usdcRows,
     assets,
+    mainnetAssets,
+    pricesUnavailable:
+      isMainnet && mainnetAssets.some((asset) => asset.priceUsd === null),
     series,
     changeAbs,
     changePct,
-    coverageStart: activity.data?.coverageStart ?? null,
-    historyLoading:
-      enabled && series.length === 0 && (activity.isPending || !ready),
-    historyError: activity.isError,
-    balancesUpdating: enabled && (walletBalances?.updating ?? true),
     recent,
     activityLoading: enabled && activity.isPending,
   };
+}
+
+function isHistoryPoint(value: unknown): value is HistoryPoint {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as HistoryPoint).t === "number" &&
+    typeof (value as HistoryPoint).value === "number"
+  );
 }
