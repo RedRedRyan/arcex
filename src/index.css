@@ -309,7 +309,7 @@ body {
   padding: 20px;
   border-radius: 16px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--surface-muted), transparent);
+  @apply bg-gradient-to-br from-white/15 via-transparent to-transparent;
 }
 .total-block {
   display: flex;
@@ -452,11 +452,11 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 .asset-card {
+  @apply bg-gradient-to-br from-white/15 via-transparent to-transparent;
   scroll-snap-align: start;
   padding: 14px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: var(--surface-muted);
 }
 .asset-card-head {
   display: flex;
@@ -526,7 +526,7 @@ body {
 /* USDC rows (mainnet) */
 .usdc-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
 }
 .usdc-row {

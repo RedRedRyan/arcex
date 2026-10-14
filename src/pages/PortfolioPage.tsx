@@ -57,7 +57,9 @@ function Skeleton({
   w?: string | number;
   r?: number;
 }) {
-  return <div className="sk" style={{ height: h, width: w, borderRadius: r }} />;
+  return (
+    <div className="sk" style={{ height: h, width: w, borderRadius: r }} />
+  );
 }
 
 function TotalSkeleton() {
@@ -150,7 +152,9 @@ function AssetCard({
       <div className="asset-value">
         {valueUsd === null ? "USD unavailable" : fmtUsd(valueUsd)}
       </div>
-      {priceUsd !== null && <div className="asset-price">@ {fmtUsd(priceUsd)}</div>}
+      {priceUsd !== null && (
+        <div className="asset-price">@ {fmtUsd(priceUsd)}</div>
+      )}
     </div>
   );
 }
@@ -201,11 +205,7 @@ function SyntheticCard({
 }
 
 // ── Activity row ─────────────────────────────────────────────────────────────
-function ActivityRow({
-  item,
-}: {
-  item: ActivityItem;
-}) {
+function ActivityRow({ item }: { item: ActivityItem }) {
   return (
     <a
       className="activity-row"
@@ -217,9 +217,7 @@ function ActivityRow({
       <span className="act-amount">{item.amount}</span>
       <span className="act-detail">{item.detail}</span>
       <span className="act-time">
-        {item.time
-          ? new Date(item.time * 1000).toLocaleDateString()
-          : "—"}
+        {item.time ? new Date(item.time * 1000).toLocaleDateString() : "—"}
       </span>
       <ExternalLink size={13} />
     </a>
@@ -259,14 +257,6 @@ export default function PortfolioPage() {
       <div className="page-head">
         <div className="page-head-left">
           <h1>Portfolio</h1>
-          <div className="head-sub">
-            <NetworkBadge />
-            {isMainnet ? (
-              <span className="tagline">Real assets · real USDC</span>
-            ) : (
-              <span className="tagline">Arc Testnet · simulated</span>
-            )}
-          </div>
         </div>
         {addressUrl && (
           <a
@@ -310,39 +300,17 @@ export default function PortfolioPage() {
               </div>
             ) : (
               <div className="chart-legend">
-                <span className="chart-change">7d {fmtPct(portfolio.changePct)}</span>
-                <span className="chart-note">reconstructed from on-chain activity</span>
+                <span className="chart-change">
+                  7d {fmtPct(portfolio.changePct)}
+                </span>
+                <span className="chart-note">
+                  reconstructed from on-chain activity
+                </span>
               </div>
             )}
           </div>
         )}
       </section>
-
-      {/* Add funds / bridge — gated per network */}
-      <div className="quick-row">
-        {faucetEnabled ? (
-          <Link to="/faucet" className="btn btn-soft">
-            + Add Funds
-          </Link>
-        ) : (
-          <FeatureLockedNotice feature="faucet" title="Add Funds" />
-        )}
-        {bridgeEnabled ? (
-          <DynamicBridgeWidget className="btn btn-primary" />
-        ) : (
-          <FeatureLockedNotice feature="bridge" title="Bridge USDC" />
-        )}
-      </div>
-
-      {portfolio.error && (
-        <div className="notice notice-error">{portfolio.error}</div>
-      )}
-      {isMainnet && portfolio.pricesUnavailable && (
-        <div className="notice notice-warn">
-          One or more live Arc pool prices are unavailable. Token balances are
-          still shown without those USD values.
-        </div>
-      )}
 
       {/* ── MAINNET: USDC across exactly 3 chains ───────────────────────── */}
       {isMainnet && (
@@ -355,7 +323,9 @@ export default function PortfolioPage() {
           </h2>
           <div className="usdc-list">
             {loading
-              ? config.usdcChains.map((c) => <UsdcRowSkeleton key={c.chainId} />)
+              ? config.usdcChains.map((c) => (
+                  <UsdcRowSkeleton key={c.chainId} />
+                ))
               : portfolio.usdcByChain.map((row) => {
                   const chain = config.usdcChains.find(
                     (c) => c.chainId === row.chainId,

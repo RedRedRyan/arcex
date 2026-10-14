@@ -55,11 +55,10 @@ export const navLinks = [
 ] as const;
 
 export const NAV_ITEMS = [
-  { href: "/market", label: "Markets" },
   { href: "/spot", label: "Spot" },
   { href: "/swap", label: "Swap" },
-  { href: "/portfolio", label: "Portfolio" },
   { href: "/earn", label: "Earn" },
+  { href: "/portfolio", label: "Portfolio" },
 ];
 export const socials = [
   {

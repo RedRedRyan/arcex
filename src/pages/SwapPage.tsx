@@ -286,19 +286,12 @@ function SwapPageContent() {
     <div className="container mx-auto max-w-screen-xl px-4 pb-16 pt-10 sm:pt-14">
       <div className="mx-auto max-w-xl">
         <div className="mb-7 text-center">
-          <p className="mt-2 text-sm text-white">
-            Get a live quote and swap tokens across supported networks.
-          </p>
+          <h1 className="display text-3xl font-bold sm:text-4xl">Swap</h1>
         </div>
 
         <section
-          className="rounded-3xl p-4 sm:p-6"
+          className="rounded-3xl p-4 sm:p-6 bg-gradient-to-br from-white/15 via-transparent to-transparent"
           aria-label="Token swap"
-          style={{
-            background: "rgba(12,17,25,0.9)",
-            border: "1px solid var(--border)",
-            boxShadow: "0 24px 80px rgba(0,0,0,0.32)",
-          }}
         >
           <div className="mb-4 flex items-center justify-between">
             <span className="text-sm font-semibold">You pay</span>
