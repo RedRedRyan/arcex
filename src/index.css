@@ -684,6 +684,7 @@ body {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    EARN — vault discovery and deposit (mainnet only)
+   Vault grid: 2 columns × 3 rows on mobile, 3 columns × 2 rows on lg.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .earn-disclaimer {
@@ -714,114 +715,195 @@ body {
   color: var(--subtle);
 }
 
+.earn-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--subtle);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.earn-refresh:hover {
+  color: var(--ink);
+  border-color: var(--ink-2);
+}
+
+/* ── Vault grid ──────────────────────────────────────────────────────────── */
+
 .vault-grid {
-  margin-top: 20px;
+  margin-top: 16px;
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  /* mobile: 2 × 3 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 1024px) {
+  .vault-grid {
+    margin-top: 20px;
+    gap: 14px;
+    /* lg: 3 × 2 */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .vault-card {
-  @apply bg-gradient-to-br from-white/15 via-transparent to-transparent;
-  padding: 15px;
-  border-radius: 15px;
-
   display: flex;
   flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background-image: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0.15),
+    transparent 55%
+  );
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.vault-card:hover {
+  border-color: var(--border-strong);
+}
+@media (min-width: 1024px) {
+  .vault-card {
+    gap: 11px;
+    padding: 16px;
+  }
+  .vault-card:hover {
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vault-card {
+    transition: none;
+  }
+  .vault-card:hover {
+    transform: none;
+  }
 }
 
-.vault-head {
+.vault-top {
   display: flex;
   align-items: center;
-  gap: 11px;
-}
-.vault-id {
-  flex: 1;
-  min-width: 0;
-}
-.vault-name {
-  font-size: 14px;
-  font-weight: 620;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.vault-sub {
-  font-size: 11.5px;
-  color: var(--subtle);
-  margin-top: 1px;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .vault-apy {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  line-height: 1.1;
 }
 .vault-apy-value {
-  font-size: 17px;
-  font-weight: 660;
+  font-size: 18px;
+  font-weight: 680;
   color: #10b981;
   font-variant-numeric: tabular-nums;
 }
 .vault-apy-label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  margin-top: 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--subtle);
 }
 
+.vault-id {
+  min-width: 0;
+}
+.vault-name {
+  font-size: 13px;
+  font-weight: 640;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.vault-sub {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .vault-stats {
-  margin-top: 10px;
-  padding-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
 }
 .vault-stat {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 .vault-stat-label {
-  font-size: 11.5px;
+  font-size: 10px;
   color: var(--subtle);
 }
 .vault-stat-value {
-  font-size: 11px;
-  font-weight: 560;
+  font-size: 12.5px;
+  font-weight: 620;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .vault-stat-value.warn {
   color: #f59e0b;
 }
 
-.vault-flags {
-  @apply flex flex-row mt-4;
+/* Liquidity meter: share of deposits that can be withdrawn right now */
+.vault-meter {
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
-.flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.vault-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.vault-meter span.warn {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.vault-fees {
   font-size: 10.5px;
-  font-weight: 560;
-  padding: 3px 7px;
-  border-radius: 999px;
+  color: var(--subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.flag-good {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-}
-.flag-warn {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
+
+.vault-foot {
+  margin-top: auto;
+  padding-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .vault-contract {
-  margin-right: auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  align-self: flex-start;
   font-size: 10.5px;
   color: var(--subtle);
   text-decoration: none;
@@ -831,92 +913,381 @@ body {
   color: var(--ink);
 }
 
-/* Earn deposit popover */
-.deposit-popover-backdrop {
+.vault-deposit-btn {
+  width: 100%;
+  height: 34px;
+  border: none;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 640;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.vault-deposit-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #ffffff;
+}
+.vault-deposit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Deposit sheet: bottom sheet on mobile, centered modal ≥ 640px ───────── */
+
+.dp-backdrop {
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(4px);
   animation: fade-in 160ms ease both;
 }
-.deposit-popover {
-  width: 100%;
-  max-width: 380px;
-  padding: 20px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+@media (min-width: 640px) {
+  .dp-backdrop {
+    align-items: center;
+    padding: 18px;
+  }
 }
-.sheet-title {
+
+.dp {
+  width: 100%;
+  max-width: 440px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: #0d1320;
+  color: var(--ink);
+  box-shadow: 0 -12px 50px rgba(0, 0, 0, 0.5);
+  animation: dp-rise 220ms ease both;
+}
+@media (min-width: 640px) {
+  .dp {
+    padding: 20px;
+    border-radius: 22px;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+}
+@keyframes dp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dp {
+    animation: none;
+  }
+}
+
+.dp-grab {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+@media (min-width: 640px) {
+  .dp-grab {
+    display: none;
+  }
+}
+
+.dp-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dp-head-id {
+  flex: 1;
+  min-width: 0;
+}
+.dp-title {
   font-size: 16px;
-  font-weight: 640;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sheet-sub {
+.dp-sub {
+  margin-top: 2px;
   font-size: 12px;
   color: var(--subtle);
-  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sheet-label {
-  display: block;
-  font-size: 12px;
-  color: var(--subtle);
-  margin-top: 16px;
-}
-.sheet-input {
-  width: 100%;
-  margin-top: 6px;
-  padding: 10px 12px;
-  border-radius: 10px;
+.dp-close {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--surface-muted);
-  color: var(--ink);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
+  background: var(--surface-strong);
+  color: var(--ink-2);
+  cursor: pointer;
 }
-.sheet-input:focus {
-  outline: none;
+.dp-close:hover:not(:disabled) {
+  color: var(--ink);
   border-color: var(--ink-2);
 }
+.dp-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dp-note {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.dp-connect {
+  margin-top: 16px;
+}
+
+.dp-apy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.08);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.dp-apy-row strong {
+  font-size: 15px;
+  color: #10b981;
+  font-variant-numeric: tabular-nums;
+}
+
+.dp-label {
+  display: block;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--subtle);
+}
+.dp-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  transition: border-color 150ms ease;
+}
+.dp-input-wrap:focus-within {
+  border-color: var(--ink-2);
+}
+.dp-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+.dp-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+.dp-input-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.dp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dp-chip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
+}
+.dp-chip:hover:not(:disabled) {
+  border-color: var(--ink-2);
+}
+.dp-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(251, 79, 31, 0.1);
+}
+.dp-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dp-summary {
+  margin-top: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.dp-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+}
+.dp-summary > div + div {
+  border-top: 1px solid var(--border);
+}
+.dp-summary span {
+  color: var(--subtle);
+}
+.dp-summary strong {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dp-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.dp-alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.dp-primary {
+  width: 100%;
+  height: 48px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.dp-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.dp-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dp-secondary {
+  width: 100%;
+  height: 40px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.dp-secondary:hover:not(:disabled) {
+  color: var(--ink);
+}
+.dp-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dp-fine {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--subtle);
+}
+.dp-fine svg {
+  flex: none;
+  margin-top: 1px;
+  color: #10b981;
+}
+
+.dp-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 8px;
+}
+.dp-success-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.dp-success-title {
+  margin-top: 14px;
+  font-size: 17px;
+  font-weight: 650;
+}
+.dp-success .dp-primary {
+  margin-top: 18px;
+}
+
 .earn-connect-button {
   display: inline-flex;
   width: 100%;
   justify-content: center;
-}
-.deposit-popover > .btn {
-  display: flex;
-  width: 100%;
-  justify-content: center;
-  margin-top: 16px;
-}
-.sheet-summary {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.sheet-summary > div {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12.5px;
-}
-.sheet-summary span {
-  color: var(--subtle);
-}
-.sheet-summary strong {
-  font-variant-numeric: tabular-nums;
-}
-.sheet-outcome {
-  margin-top: 13px;
-  padding: 9px 11px;
-  border-radius: 9px;
-  background: var(--surface-muted);
-  font-size: 12.5px;
 }
 .deposit-transaction-link {
   display: inline-flex;
@@ -929,25 +1300,4 @@ body {
 }
 .deposit-transaction-link:hover {
   text-decoration: underline;
-}
-.sheet-actions {
-  display: flex;
-  gap: 9px;
-  margin-top: 16px;
-}
-.sheet-actions .btn {
-  flex: 1;
-  justify-content: center;
-}
-.sheet-fine {
-  margin-top: 12px;
-  font-size: 11px;
-  color: var(--subtle);
-  line-height: 1.5;
-}
-
-@media (max-width: 640px) {
-  .vault-grid {
-    grid-template-columns: 1fr;
-  }
 }

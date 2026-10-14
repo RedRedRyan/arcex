@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import {
+  Check,
   ExternalLink,
   Info,
   RefreshCw,
   ShieldCheck,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import { useNetwork } from "../config/NetworkProvider";
 import { NetworkBadge } from "../config/NetworkBadge";
@@ -24,64 +26,87 @@ import { useEarnVaults, type EarnActionOutcome } from "../hooks/useEarnVaults";
 /** Emerald accent — Earn is a mainnet surface, matching the Portfolio identity. */
 const ACCENT_GLOW = "glow-emerald";
 
+/** One-tap amounts in the deposit sheet (USDC). */
+const QUICK_AMOUNTS = [10, 50, 100, 500];
+
+const AMOUNT_PATTERN = /^(?:\d+(?:\.\d{1,6})?|\.\d{1,6})$/;
+
 function VaultCard({
   vault,
   onDeposit,
   pending,
   disabledReason,
+  explorerUrl,
 }: {
   vault: EarnVault;
   onDeposit: (v: EarnVault) => void;
   pending: boolean;
   disabledReason: string | null;
+  explorerUrl: string;
 }) {
   const lowLiquidity = vault.status === "low_liquidity";
-  const hasWarnings = vault.warnings.length > 0;
+  const liquidityPct =
+    vault.totalDeposits > 0
+      ? Math.min(
+          100,
+          Math.max(0, (vault.liquidity / vault.totalDeposits) * 100),
+        )
+      : 0;
 
   return (
     <div className="vault-card">
-      <div className="vault-head">
-        <AssetIcon symbol="USDC" size={34} />
-        <div className="vault-id">
-          <div className="vault-name">{vault.name}</div>
-          <div className="vault-sub">
-            {vault.protocol} · {vault.manager}
-          </div>
-        </div>
+      <div className="vault-top">
+        <AssetIcon symbol="USDC" size={30} />
         <div className="vault-apy">
           <span className="vault-apy-value">{formatApy(vault.apy)}</span>
           <span className="vault-apy-label">APY</span>
         </div>
       </div>
 
+      <div className="vault-id">
+        <div className="vault-name">{vault.name}</div>
+        <div className="vault-sub">
+          {vault.protocol} · {vault.manager}
+        </div>
+      </div>
+
       <div className="vault-stats">
         <div className="vault-stat">
-          <span className="vault-stat-label">Total deposits</span>
+          <span className="vault-stat-label">Deposits</span>
           <span className="vault-stat-value">
             ${formatCompact(vault.totalDeposits)}
           </span>
         </div>
         <div className="vault-stat">
-          <span className="vault-stat-label">Available liquidity</span>
+          <span className="vault-stat-label">Liquidity</span>
           <span className={`vault-stat-value ${lowLiquidity ? "warn" : ""}`}>
             ${formatCompact(vault.liquidity)}
           </span>
         </div>
-        <div className="vault-stat">
-          <span className="vault-stat-label">Fees</span>
-          <span className="vault-stat-value">
-            {formatFee(vault.managementFee)} mgmt
-            {vault.performanceFee > 0 && (
-              <> · {formatFee(vault.performanceFee)} perf</>
-            )}
-          </span>
-        </div>
       </div>
 
-      <div className="vault-flags">
+      <div
+        className="vault-meter"
+        role="img"
+        aria-label={`${Math.round(liquidityPct)}% of deposits available`}
+      >
+        <span
+          className={lowLiquidity ? "warn" : ""}
+          style={{ width: `${liquidityPct}%` }}
+        />
+      </div>
+
+      <div className="vault-fees">
+        {formatFee(vault.managementFee)} mgmt
+        {vault.performanceFee > 0 && (
+          <> · {formatFee(vault.performanceFee)} perf</>
+        )}
+      </div>
+
+      <div className="vault-foot">
         <a
           className="vault-contract"
-          href={`https://abscan.org/address/${vault.vaultAddress}`}
+          href={`${explorerUrl}/address/${vault.vaultAddress}`}
           target="_blank"
           rel="noreferrer noopener"
           title={vault.vaultAddress}
@@ -91,7 +116,7 @@ function VaultCard({
         </a>
         <button
           type="button"
-          className="deposit-btn bg-white text-black"
+          className="vault-deposit-btn"
           onClick={() => onDeposit(vault)}
           disabled={pending}
           title={disabledReason ?? undefined}
@@ -99,6 +124,37 @@ function VaultCard({
           {pending ? "Depositing…" : "Deposit"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function VaultCardSkeleton() {
+  return (
+    <div className="vault-card">
+      <div className="vault-top">
+        <div
+          className="sk"
+          style={{ height: 30, width: 30, borderRadius: 15 }}
+        />
+        <div
+          className="sk"
+          style={{ height: 22, width: 46, borderRadius: 8 }}
+        />
+      </div>
+      <div className="sk" style={{ height: 13, width: "75%" }} />
+      <div className="sk" style={{ height: 10, width: "55%" }} />
+      <div
+        className="sk"
+        style={{ height: 28, width: "100%", borderRadius: 8 }}
+      />
+      <div
+        className="sk"
+        style={{ height: 4, width: "100%", borderRadius: 4 }}
+      />
+      <div
+        className="sk"
+        style={{ height: 34, width: "100%", borderRadius: 999 }}
+      />
     </div>
   );
 }
@@ -126,12 +182,14 @@ export default function EarnPage() {
 
   const wrongChain = isConnected && chainId !== config.chain.id;
 
+  // Top 6 by APY: fills a 3 × 2 grid on large screens and 2 × 3 on mobile.
   const vaultsToShow = useMemo(() => {
     const copy = [...vaults];
     copy.sort((a, b) => b.apy - a.apy);
     return copy.slice(0, 6);
   }, [vaults]);
 
+  // Escape closes the sheet; the page behind it doesn't scroll while it's open.
   useEffect(() => {
     if (!selected) return;
 
@@ -139,8 +197,13 @@ export default function EarnPage() {
       if (event.key === "Escape" && !pending) setSelected(null);
     };
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [selected, pending]);
 
   const onDeposit = (v: EarnVault) => {
@@ -151,7 +214,7 @@ export default function EarnPage() {
 
   const confirmDeposit = async () => {
     if (!selected) return;
-    if (!/^(?:\d+(?:\.\d{1,6})?|\.\d{1,6})$/.test(amount.trim())) {
+    if (!AMOUNT_PATTERN.test(amount.trim())) {
       setOutcome("Enter a valid USDC amount with up to 6 decimal places.");
       return;
     }
@@ -214,14 +277,37 @@ export default function EarnPage() {
     );
   }
 
+  // Derived deposit-sheet state
+  const amountTrim = amount.trim();
+  const amountNum = Number(amountTrim) || 0;
+  const amountValid = AMOUNT_PATTERN.test(amountTrim) && amountNum > 0;
+  const success =
+    outcome !== null && typeof outcome === "object" && outcome.ok
+      ? outcome
+      : null;
+  const errorMessage =
+    outcome === null
+      ? null
+      : typeof outcome === "string"
+        ? outcome
+        : outcome.ok
+          ? null
+          : outcome.message;
+
   return (
     <div className={`page fade-in ${ACCENT_GLOW}`}>
       <div className="page-head">
         <div className="page-head-left">
           <h1>Deposit USDC into audited vaults</h1>
         </div>
-        <button className="" onClick={() => void refetch()}>
-          <RefreshCw size={13} />
+        <button
+          type="button"
+          className="earn-refresh"
+          onClick={() => void refetch()}
+          aria-label="Refresh vaults"
+          title="Refresh vaults"
+        >
+          <RefreshCw size={14} />
         </button>
       </div>
 
@@ -247,22 +333,8 @@ export default function EarnPage() {
 
       {loading ? (
         <div className="vault-grid">
-          {[0, 1, 2, 3].map((i) => (
-            <div className="vault-card" key={i}>
-              <div
-                className="sk"
-                style={{ height: 34, width: 34, borderRadius: 17 }}
-              />
-              <div style={{ height: 10 }} />
-              <div className="sk" style={{ height: 14, width: "60%" }} />
-              <div style={{ height: 8 }} />
-              <div className="sk" style={{ height: 12, width: "40%" }} />
-              <div style={{ height: 14 }} />
-              <div
-                className="sk"
-                style={{ height: 30, width: "100%", borderRadius: 8 }}
-              />
-            </div>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <VaultCardSkeleton key={i} />
           ))}
         </div>
       ) : vaultsToShow.length === 0 ? (
@@ -276,6 +348,7 @@ export default function EarnPage() {
               key={v.vaultAddress}
               vault={v}
               onDeposit={onDeposit}
+              explorerUrl={config.explorerUrl}
               pending={pending && selected?.vaultAddress === v.vaultAddress}
               disabledReason={
                 !isConnected
@@ -289,167 +362,226 @@ export default function EarnPage() {
         </div>
       )}
 
-      {/* Deposit popover */}
+      {/* Deposit sheet: bottom sheet on mobile, centered modal on desktop */}
       {selected && (
         <div
-          className="deposit-popover-backdrop"
+          className="dp-backdrop"
           onClick={() => {
             if (!pending) setSelected(null);
           }}
         >
           <div
-            className="deposit-popover"
+            className="dp"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="deposit-popover-title"
+            aria-labelledby="dp-title"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="dp-grab" aria-hidden="true" />
+
+            <div className="dp-head">
+              <AssetIcon symbol="USDC" size={38} />
+              <div className="dp-head-id">
+                <div className="dp-title" id="dp-title">
+                  {selected.name}
+                </div>
+                <div className="dp-sub">
+                  {selected.protocol} · {selected.manager}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="dp-close"
+                onClick={() => setSelected(null)}
+                disabled={pending}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             {!isConnected ? (
               <>
-                <div className="sheet-title" id="deposit-popover-title">
-                  Connect your wallet
-                </div>
-                <div className="sheet-sub">
+                <p className="dp-note">
                   Connect a wallet to deposit into {selected.name}.
+                </p>
+                <div className="dp-connect">
+                  <DynamicWidget
+                    buttonClassName="btn btn-primary"
+                    innerButtonComponent={
+                      <span className="earn-connect-button">
+                        Connect wallet
+                      </span>
+                    }
+                  />
                 </div>
-                <DynamicWidget
-                  buttonClassName="btn btn-primary"
-                  innerButtonComponent={
-                    <span className="earn-connect-button">Connect wallet</span>
-                  }
-                />
-                <div className="sheet-actions">
-                  <button
-                    className="btn btn-soft"
-                    onClick={() => setSelected(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="dp-secondary"
+                  onClick={() => setSelected(null)}
+                >
+                  Cancel
+                </button>
               </>
             ) : wrongChain ? (
               <>
-                <div className="sheet-title" id="deposit-popover-title">
-                  Switch network
-                </div>
-                <div className="sheet-sub">
+                <p className="dp-note">
                   Deposits require Arc Mainnet. Switch your connected wallet to
                   continue.
-                </div>
-                {typeof outcome === "string" && (
-                  <div className="sheet-outcome" role="alert">
-                    {outcome}
+                </p>
+                {errorMessage && (
+                  <div className="dp-alert" role="alert">
+                    <TriangleAlert size={15} />
+                    <span>{errorMessage}</span>
                   </div>
                 )}
-                <div className="sheet-actions">
-                  <button
-                    className="btn btn-soft"
-                    onClick={() => setSelected(null)}
-                    disabled={isSwitchingChain}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => void switchToRequiredChain()}
-                    disabled={isSwitchingChain}
-                  >
-                    {isSwitchingChain ? "Switching…" : "Switch to Arc Mainnet"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="dp-primary"
+                  onClick={() => void switchToRequiredChain()}
+                  disabled={isSwitchingChain}
+                >
+                  {isSwitchingChain ? "Switching…" : "Switch to Arc Mainnet"}
+                </button>
+                <button
+                  type="button"
+                  className="dp-secondary"
+                  onClick={() => setSelected(null)}
+                  disabled={isSwitchingChain}
+                >
+                  Cancel
+                </button>
               </>
-            ) : typeof outcome === "object" && outcome?.ok ? (
-              <>
-                <div className="sheet-title" id="deposit-popover-title">
-                  Deposit submitted
+            ) : success ? (
+              <div className="dp-success">
+                <div className="dp-success-icon">
+                  <Check size={26} />
                 </div>
-                <div className="sheet-sub">
-                  Your wallet submitted the deposit transaction.
-                </div>
-                <div className="sheet-outcome" role="status">
-                  {outcome.message}
-                </div>
-                {outcome.txHash && (
+                <div className="dp-success-title">Deposit submitted</div>
+                <p className="dp-note" role="status">
+                  {success.message}
+                </p>
+                {success.txHash && (
                   <a
                     className="deposit-transaction-link"
-                    href={`${config.explorerUrl}/tx/${outcome.txHash}`}
+                    href={`${config.explorerUrl}/tx/${success.txHash}`}
                     target="_blank"
                     rel="noreferrer noopener"
                   >
                     View transaction <ExternalLink size={13} />
                   </a>
                 )}
-                <div className="sheet-actions">
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => setSelected(null)}
-                  >
-                    Done
-                  </button>
-                </div>
-              </>
+                <button
+                  type="button"
+                  className="dp-primary"
+                  onClick={() => setSelected(null)}
+                >
+                  Done
+                </button>
+              </div>
             ) : (
               <>
-                <div className="sheet-title" id="deposit-popover-title">
-                  Deposit into {selected.name}
-                </div>
-                <div className="sheet-sub">
-                  Current APY {formatApy(selected.apy)} · {selected.protocol}
+                <div className="dp-apy-row">
+                  <span>Current APY</span>
+                  <strong>{formatApy(selected.apy)}</strong>
                 </div>
 
-                <label className="sheet-label" htmlFor="earn-amount">
-                  Amount (USDC)
+                <label className="dp-label" htmlFor="earn-amount">
+                  Amount
                 </label>
-                <input
-                  id="earn-amount"
-                  className="sheet-input"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={amount}
-                  disabled={pending}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+                <div className="dp-input-wrap">
+                  <input
+                    id="earn-amount"
+                    className="dp-input"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0.00"
+                    value={amount}
+                    disabled={pending}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                  <span className="dp-input-unit">
+                    <AssetIcon symbol="USDC" size={18} />
+                    USDC
+                  </span>
+                </div>
 
-                <div className="sheet-summary">
+                <div className="dp-chips">
+                  {QUICK_AMOUNTS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`dp-chip ${
+                        amountTrim === String(value) ? "active" : ""
+                      }`}
+                      onClick={() => setAmount(String(value))}
+                      disabled={pending}
+                    >
+                      ${value}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="dp-summary">
                   <div>
                     <span>You deposit</span>
-                    <strong>{formatUsdc(Number(amount) || 0)} USDC</strong>
+                    <strong>{formatUsdc(amountNum)} USDC</strong>
+                  </div>
+                  <div>
+                    <span>Est. monthly yield</span>
+                    <strong>
+                      {formatUsdc((amountNum * selected.apy) / 12)} USDC
+                    </strong>
                   </div>
                   <div>
                     <span>Est. yearly yield</span>
+                    <strong>{formatUsdc(amountNum * selected.apy)} USDC</strong>
+                  </div>
+                  <div>
+                    <span>Fees</span>
                     <strong>
-                      {formatUsdc((Number(amount) || 0) * selected.apy)} USDC
+                      {formatFee(selected.managementFee)} mgmt
+                      {selected.performanceFee > 0 && (
+                        <> · {formatFee(selected.performanceFee)} perf</>
+                      )}
                     </strong>
                   </div>
                 </div>
 
-                {outcome !== null &&
-                  (typeof outcome === "string" || !outcome.ok) && (
-                    <div className="sheet-outcome" role="alert">
-                      {typeof outcome === "string" ? outcome : outcome.message}
-                    </div>
-                  )}
+                {errorMessage && (
+                  <div className="dp-alert" role="alert">
+                    <TriangleAlert size={15} />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
 
-                <div className="sheet-actions">
-                  <button
-                    className="btn btn-soft"
-                    onClick={() => setSelected(null)}
-                    disabled={pending}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => void confirmDeposit()}
-                    disabled={pending}
-                  >
-                    {pending ? "Confirm in wallet…" : "Continue deposit"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="dp-primary"
+                  onClick={() => void confirmDeposit()}
+                  disabled={pending || !amountValid}
+                >
+                  {pending
+                    ? "Confirm in wallet…"
+                    : amountValid
+                      ? `Deposit ${formatUsdc(amountNum)} USDC`
+                      : "Enter an amount"}
+                </button>
+                <button
+                  type="button"
+                  className="dp-secondary"
+                  onClick={() => setSelected(null)}
+                  disabled={pending}
+                >
+                  Cancel
+                </button>
 
-                <p className="sheet-fine">
-                  Confirm the transaction in your wallet. arcex never takes
-                  custody of the deposit.
+                <p className="dp-fine">
+                  <ShieldCheck size={13} />
+                  <span>
+                    Confirm the transaction in your wallet. Deposits go straight
+                    to the vault contract and arcex never takes custody.
+                  </span>
                 </p>
               </>
             )}

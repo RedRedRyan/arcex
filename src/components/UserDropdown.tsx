@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { ChevronDown, Copy, ExternalLink, LogOut, UserRound } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  LogOut,
+  UserRound,
+  WalletIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   DynamicUserProfile,
@@ -121,49 +128,6 @@ const UserDropdown = () => {
             border: "1px solid var(--border)",
           }}
         >
-          <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-16 rounded-lg flex flex-col items-center">
-              <span className="text-orange-500 text-lg font-medium">
-                {portfolio.usdcTotal.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-              <span className="text-white text-xs">usdc</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">
-                {formatAddress(address)}
-              </span>
-              <span className="text-xs" style={{ color: "var(--subtle)" }}>
-                {isMainnet ? "Mainnet" : "Testnet"} · {config.label}
-                {isMainnet && (
-                  <span title="Total USDC across Arc, Ethereum and Base">
-                    {" "}
-                    · 3 chains
-                  </span>
-                )}
-              </span>
-              {walletChainMismatch && (
-                <span
-                  className="mt-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
-                  style={{
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: "#f59e0b",
-                  }}
-                >
-                  Switch wallet network to see {isMainnet ? "mainnet" : "testnet"}{" "}
-                  balances
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
-          <nav className="sm:hidden">
-            <NavItems onNavigate={() => setOpen(false)} />
-          </nav>
-
           <button
             type="button"
             role="menuitem"
@@ -173,9 +137,14 @@ const UserDropdown = () => {
             }}
             className="flex w-full items-center rounded-md px-2 py-2 text-left text-sm hover:bg-white/10"
           >
-            <UserRound className="mr-2 h-4 w-4" />
-            User profile
+            <WalletIcon className="mr-2 h-6 w-6" />
+            Open Wallet
           </button>
+
+          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
+          <nav className="sm:hidden">
+            <NavItems onNavigate={() => setOpen(false)} />
+          </nav>
 
           <button
             type="button"
