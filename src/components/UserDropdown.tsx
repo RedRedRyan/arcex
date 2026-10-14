@@ -5,7 +5,6 @@ import {
   Copy,
   ExternalLink,
   LogOut,
-  UserRound,
   WalletIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,8 +57,7 @@ const UserDropdown = () => {
     };
   }, [open]);
 
-  // Not connected — render the Dynamic connect widget (handles all wallet types,
-  // email, social, passkeys, injected, WalletConnect, etc.)
+  // Not connected — render the Dynamic connect widget.
   if (!isConnected || !address) {
     return (
       <>

@@ -1,7 +1,11 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Routes, Route, Outlet, Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAccount } from "wagmi";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import Header from "./components/Header";
 import Hero from "./pages/Hero";
+import ConnectPage from "./pages/ConnectPage";
 import Grainient from "./components/Grainient";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -63,6 +67,32 @@ const Layout = () => {
 
 // Paths match `navLinks` in constants.ts
 const App = () => {
+  const { isConnected, address } = useAccount();
+  const { sdkHasLoaded } = useDynamicContext();
+  const navigate = useNavigate();
+  const connected = isConnected && Boolean(address);
+  const wasConnected = useRef(connected);
+
+  useEffect(() => {
+    if (connected && !wasConnected.current) {
+      navigate("/", { replace: true });
+    }
+    wasConnected.current = connected;
+  }, [connected, navigate]);
+
+  if (!sdkHasLoaded) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div
+          aria-label="Loading"
+          className="size-8 animate-spin rounded-full border-2 border-white/20 border-t-[var(--accent)]"
+        />
+      </main>
+    );
+  }
+
+  if (!connected) return <ConnectPage />;
+
   return (
     <Routes>
       <Route element={<Layout />}>
