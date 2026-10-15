@@ -404,6 +404,46 @@ export const SWAP_TOKENS: SwapTokenConfig[] = [
   },
 ];
 
+/**
+ * Every coin listed in the swap UI, with its chain + contract address.
+ *
+ * Single source of truth shared by the Swap page (token dropdowns) and the
+ * Portfolio page (which whitelists these addresses in the Dynamic balance
+ * query so none are spam-filtered, and shows a card per holding). Native
+ * assets use the zero address.
+ *
+ * Verify Ethereum / Base addresses on their block explorers before shipping.
+ */
+export const SWAP_COIN_ADDRESSES: ReadonlyArray<{
+  chainId: number;
+  symbol: string;
+  address: `0x${string}`;
+  decimals: number;
+}> = [
+  // Arc mainnet
+  { chainId: 5042, symbol: "EURC", address: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", decimals: 6 },
+  { chainId: 5042, symbol: "WETH", address: "0x128cC466B61f542da60c70E3aA11c10e19B84EDB", decimals: 18 },
+  { chainId: 5042, symbol: "cirBTC", address: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", decimals: 8 },
+  // Ethereum
+  { chainId: 1, symbol: "ETH", address: "0x0000000000000000000000000000000000000000", decimals: 18 },
+  { chainId: 1, symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
+  { chainId: 1, symbol: "EURC", address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", decimals: 6 },
+  { chainId: 1, symbol: "DAI", address: "0x6B175474E89094C44Da98b954EedeAC495271d0F", decimals: 18 },
+  { chainId: 1, symbol: "WBTC", address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals: 8 },
+  { chainId: 1, symbol: "cbBTC", address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8 },
+  // Base
+  { chainId: 8453, symbol: "ETH", address: "0x0000000000000000000000000000000000000000", decimals: 18 },
+  { chainId: 8453, symbol: "EURC", address: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", decimals: 6 },
+  { chainId: 8453, symbol: "DAI", address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", decimals: 18 },
+  { chainId: 8453, symbol: "cbBTC", address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8 },
+];
+
+/** Contract addresses (non-native) to whitelist in the Dynamic balance query. */
+export const SWAP_WHITELISTED_CONTRACTS: readonly `0x${string}`[] =
+  SWAP_COIN_ADDRESSES.filter(
+    (c) => c.address !== "0x0000000000000000000000000000000000000000",
+  ).map((c) => c.address);
+
 /** localStorage key for the persisted network choice. */
 export const NETWORK_STORAGE_KEY = "arcex.network";
 

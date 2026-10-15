@@ -12,8 +12,9 @@ const Footer = () => {
           </p>
         </div>
         <p className="max-w-2xl text-sm leading-6 text-[#9a9184] md:justify-self-end">
-          NBX is a distribution and token-administration platform. Everything is
-          on testnet.Illustrative figures are not execution prices.
+          NBX is a distribution and token administration platform, live on Arc
+          Mainnet. Illustrative figures are for reference only and do not
+          represent actual execution prices.
         </p>
         <div className="flex flex-row gap-5">
           {socials.map((social) => (

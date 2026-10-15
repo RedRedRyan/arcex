@@ -7,7 +7,7 @@ const Hero = () => {
   return (
     <main>
       <Home />
-      <About />
+
       <Footer />
     </main>
   );
