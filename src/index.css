@@ -935,6 +935,62 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Append to your existing Earn styles. Adjust tokens to match your theme. */
+
+.vault-position {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  font-size: 12px;
+}
+.vault-position span {
+  opacity: 0.7;
+}
+.vault-position strong {
+  font-weight: 600;
+}
+
+.vault-claim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.vault-claim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vault-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vault-withdraw-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.vault-withdraw-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ── Deposit sheet: bottom sheet on mobile, centered modal ≥ 640px ───────── */
 

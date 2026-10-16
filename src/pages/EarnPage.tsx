@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import { formatUnits, parseUnits } from "viem";
 import {
   Check,
   ExternalLink,
@@ -21,7 +22,12 @@ import {
   formatUsdc,
   type EarnVault,
 } from "../config/earn";
-import { useEarnVaults, type EarnActionOutcome } from "../hooks/useEarnVaults";
+import { useEarnVaults } from "../hooks/useEarnVaults";
+import {
+  useEarnPositions,
+  type ActionResult,
+  type EarnPosition,
+} from "../hooks/useEarnPositions";
 
 /** Emerald accent — Earn is a mainnet surface, matching the Portfolio identity. */
 const ACCENT_GLOW = "glow-emerald";
@@ -29,22 +35,37 @@ const ACCENT_GLOW = "glow-emerald";
 /** One-tap amounts in the deposit sheet (USDC). */
 const QUICK_AMOUNTS = [10, 50, 100, 500];
 
+/** One-tap shares of the position in the withdraw sheet. */
+const WITHDRAW_PERCENTS = [25, 50, 75, 100];
+
 const AMOUNT_PATTERN = /^(?:\d+(?:\.\d{1,6})?|\.\d{1,6})$/;
+
+type Mode = "deposit" | "withdraw";
+
+const normalizeAmount = (raw: string) => {
+  const t = raw.trim();
+  return t.startsWith(".") ? `0${t}` : t;
+};
 
 function VaultCard({
   vault,
+  position,
   onDeposit,
+  onWithdraw,
   pending,
   disabledReason,
   explorerUrl,
 }: {
   vault: EarnVault;
+  position?: EarnPosition;
   onDeposit: (v: EarnVault) => void;
+  onWithdraw: (v: EarnVault) => void;
   pending: boolean;
   disabledReason: string | null;
   explorerUrl: string;
 }) {
   const lowLiquidity = vault.status === "low_liquidity";
+  const hasPosition = Boolean(position?.hasPosition);
   const liquidityPct =
     vault.totalDeposits > 0
       ? Math.min(
@@ -103,6 +124,13 @@ function VaultCard({
         )}
       </div>
 
+      {hasPosition && position && (
+        <div className="vault-position">
+          <span>Your position</span>
+          <strong>{formatUsdc(Number(position.assets))} USDC</strong>
+        </div>
+      )}
+
       <div className="vault-foot">
         <a
           className="vault-contract"
@@ -114,15 +142,29 @@ function VaultCard({
           {vault.vaultAddress.slice(0, 6)}…{vault.vaultAddress.slice(-4)}
           <ExternalLink size={11} />
         </a>
-        <button
-          type="button"
-          className="vault-deposit-btn"
-          onClick={() => onDeposit(vault)}
-          disabled={pending}
-          title={disabledReason ?? undefined}
-        >
-          {pending ? "Depositing…" : "Deposit"}
-        </button>
+        <div className="vault-actions">
+          <button
+            type="button"
+            className="vault-withdraw-btn"
+            onClick={() => onWithdraw(vault)}
+            disabled={pending || !hasPosition}
+            title={
+              disabledReason ??
+              (hasPosition ? undefined : "No position in this vault")
+            }
+          >
+            Withdraw
+          </button>
+          <button
+            type="button"
+            className="vault-deposit-btn"
+            onClick={() => onDeposit(vault)}
+            disabled={pending}
+            title={disabledReason ?? undefined}
+          >
+            {pending ? "Working…" : "Deposit"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -161,7 +203,7 @@ function VaultCardSkeleton() {
 
 export default function EarnPage() {
   const { config } = useNetwork();
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
   const {
@@ -172,13 +214,14 @@ export default function EarnPage() {
     unavailable,
     refetch,
     deposit,
+    withdraw,
     pending,
   } = useEarnVaults();
+
   const [selected, setSelected] = useState<EarnVault | null>(null);
+  const [mode, setMode] = useState<Mode>("deposit");
   const [amount, setAmount] = useState("");
-  const [outcome, setOutcome] = useState<
-    string | (EarnActionOutcome & { txHash?: string }) | null
-  >(null);
+  const [outcome, setOutcome] = useState<string | ActionResult | null>(null);
 
   const wrongChain = isConnected && chainId !== config.chain.id;
 
@@ -188,6 +231,11 @@ export default function EarnPage() {
     copy.sort((a, b) => b.apy - a.apy);
     return copy.slice(0, 6);
   }, [vaults]);
+
+  const { positions, refresh } = useEarnPositions(
+    vaultsToShow,
+    isConnected && !wrongChain ? address : undefined,
+  );
 
   // Escape closes the sheet; the page behind it doesn't scroll while it's open.
   useEffect(() => {
@@ -206,33 +254,49 @@ export default function EarnPage() {
     };
   }, [selected, pending]);
 
-  const onDeposit = (v: EarnVault) => {
+  const openSheet = (v: EarnVault, m: Mode) => {
     setSelected(v);
+    setMode(m);
     setAmount("");
     setOutcome(null);
   };
 
-  const confirmDeposit = async () => {
+  const position = selected ? positions[selected.vaultAddress] : undefined;
+  const isWithdraw = mode === "withdraw";
+
+  const confirmAction = async () => {
     if (!selected) return;
     if (!AMOUNT_PATTERN.test(amount.trim())) {
       setOutcome("Enter a valid USDC amount with up to 6 decimal places.");
       return;
     }
 
-    const trimmedAmount = amount.trim();
-    const value = Number(trimmedAmount);
-    if (!Number.isFinite(value) || value <= 0) {
+    const normalized = normalizeAmount(amount);
+    if (!(Number(normalized) > 0)) {
       setOutcome("Enter an amount greater than zero.");
       return;
     }
-    const normalizedAmount = trimmedAmount.startsWith(".")
-      ? `0${trimmedAmount}`
-      : trimmedAmount;
-    const result: EarnActionOutcome & { txHash?: string } = await deposit(
-      selected.vaultAddress,
-      normalizedAmount,
-    );
+
+    if (isWithdraw) {
+      if (!position || !position.hasPosition) {
+        setOutcome("You have no position in this vault.");
+        return;
+      }
+      if (
+        parseUnits(normalized, position.decimals) >
+        parseUnits(position.assets, position.decimals)
+      ) {
+        setOutcome("That's more than your current position.");
+        return;
+      }
+    }
+
+    const result: ActionResult = isWithdraw
+      ? await withdraw(selected.vaultAddress, normalized)
+      : await deposit(selected.vaultAddress, normalized);
+
     setOutcome(result);
+    if (result.ok) void refresh();
   };
 
   const switchToRequiredChain = async () => {
@@ -277,10 +341,35 @@ export default function EarnPage() {
     );
   }
 
-  // Derived deposit-sheet state
+  // Derived sheet state
   const amountTrim = amount.trim();
   const amountNum = Number(amountTrim) || 0;
-  const amountValid = AMOUNT_PATTERN.test(amountTrim) && amountNum > 0;
+  const positionNum = Number(position?.assets ?? 0);
+
+  const withinPosition = (() => {
+    if (!isWithdraw) return true;
+    if (!position || !AMOUNT_PATTERN.test(amountTrim)) return false;
+    return (
+      parseUnits(normalizeAmount(amountTrim), position.decimals) <=
+      parseUnits(position.assets, position.decimals)
+    );
+  })();
+  const amountValid =
+    AMOUNT_PATTERN.test(amountTrim) && amountNum > 0 && withinPosition;
+
+  const exceedsLiquidity =
+    isWithdraw && selected ? amountNum > selected.liquidity : false;
+
+  const setPercent = (pct: number) => {
+    if (!position) return;
+    const raw = parseUnits(position.assets, position.decimals);
+    setAmount(
+      pct === 100
+        ? position.assets
+        : formatUnits((raw * BigInt(pct)) / 100n, position.decimals),
+    );
+  };
+
   const success =
     outcome !== null && typeof outcome === "object" && outcome.ok
       ? outcome
@@ -294,6 +383,8 @@ export default function EarnPage() {
           ? null
           : outcome.message;
 
+  const verb = isWithdraw ? "withdraw" : "deposit";
+
   return (
     <div className={`page fade-in ${ACCENT_GLOW}`}>
       <div className="page-head">
@@ -303,7 +394,10 @@ export default function EarnPage() {
         <button
           type="button"
           className="earn-refresh"
-          onClick={() => void refetch()}
+          onClick={() => {
+            void refetch();
+            void refresh();
+          }}
           aria-label="Refresh vaults"
           title="Refresh vaults"
         >
@@ -321,7 +415,7 @@ export default function EarnPage() {
 
       {wrongChain && (
         <div className="notice notice-warn">
-          Switch your wallet to Arc mainnet to deposit.
+          Switch your wallet to Arc mainnet to deposit or withdraw.
         </div>
       )}
       {!isConnected && (
@@ -347,7 +441,9 @@ export default function EarnPage() {
             <VaultCard
               key={v.vaultAddress}
               vault={v}
-              onDeposit={onDeposit}
+              position={positions[v.vaultAddress]}
+              onDeposit={(x) => openSheet(x, "deposit")}
+              onWithdraw={(x) => openSheet(x, "withdraw")}
               explorerUrl={config.explorerUrl}
               pending={pending && selected?.vaultAddress === v.vaultAddress}
               disabledReason={
@@ -362,7 +458,7 @@ export default function EarnPage() {
         </div>
       )}
 
-      {/* Deposit sheet: bottom sheet on mobile, centered modal on desktop */}
+      {/* Deposit / withdraw sheet: bottom sheet on mobile, centered modal on desktop */}
       {selected && (
         <div
           className="dp-backdrop"
@@ -403,7 +499,8 @@ export default function EarnPage() {
             {!isConnected ? (
               <>
                 <p className="dp-note">
-                  Connect a wallet to deposit into {selected.name}.
+                  Connect a wallet to {verb} {isWithdraw ? "from" : "into"}{" "}
+                  {selected.name}.
                 </p>
                 <div className="dp-connect">
                   <DynamicWidget
@@ -426,8 +523,8 @@ export default function EarnPage() {
             ) : wrongChain ? (
               <>
                 <p className="dp-note">
-                  Deposits require Arc Mainnet. Switch your connected wallet to
-                  continue.
+                  Deposits and withdrawals require Arc Mainnet. Switch your
+                  connected wallet to continue.
                 </p>
                 {errorMessage && (
                   <div className="dp-alert" role="alert">
@@ -457,7 +554,9 @@ export default function EarnPage() {
                 <div className="dp-success-icon">
                   <Check size={26} />
                 </div>
-                <div className="dp-success-title">Deposit submitted</div>
+                <div className="dp-success-title">
+                  {isWithdraw ? "Withdrawal submitted" : "Deposit submitted"}
+                </div>
                 <p className="dp-note" role="status">
                   {success.message}
                 </p>
@@ -479,12 +578,32 @@ export default function EarnPage() {
                   Done
                 </button>
               </div>
+            ) : isWithdraw && !position?.hasPosition ? (
+              <>
+                <p className="dp-note">
+                  You don't have a position in this vault yet.
+                </p>
+                <button
+                  type="button"
+                  className="dp-secondary"
+                  onClick={() => setSelected(null)}
+                >
+                  Close
+                </button>
+              </>
             ) : (
               <>
-                <div className="dp-apy-row">
-                  <span>Current APY</span>
-                  <strong>{formatApy(selected.apy)}</strong>
-                </div>
+                {isWithdraw ? (
+                  <div className="dp-apy-row">
+                    <span>Your position</span>
+                    <strong>{formatUsdc(positionNum)} USDC</strong>
+                  </div>
+                ) : (
+                  <div className="dp-apy-row">
+                    <span>Current APY</span>
+                    <strong>{formatApy(selected.apy)}</strong>
+                  </div>
+                )}
 
                 <label className="dp-label" htmlFor="earn-amount">
                   Amount
@@ -507,46 +626,89 @@ export default function EarnPage() {
                 </div>
 
                 <div className="dp-chips">
-                  {QUICK_AMOUNTS.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`dp-chip ${
-                        amountTrim === String(value) ? "active" : ""
-                      }`}
-                      onClick={() => setAmount(String(value))}
-                      disabled={pending}
-                    >
-                      ${value}
-                    </button>
-                  ))}
+                  {isWithdraw
+                    ? WITHDRAW_PERCENTS.map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          className="dp-chip"
+                          onClick={() => setPercent(pct)}
+                          disabled={pending}
+                        >
+                          {pct === 100 ? "Max" : `${pct}%`}
+                        </button>
+                      ))
+                    : QUICK_AMOUNTS.map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`dp-chip ${
+                            amountTrim === String(value) ? "active" : ""
+                          }`}
+                          onClick={() => setAmount(String(value))}
+                          disabled={pending}
+                        >
+                          ${value}
+                        </button>
+                      ))}
                 </div>
 
                 <div className="dp-summary">
-                  <div>
-                    <span>You deposit</span>
-                    <strong>{formatUsdc(amountNum)} USDC</strong>
-                  </div>
-                  <div>
-                    <span>Est. monthly yield</span>
-                    <strong>
-                      {formatUsdc((amountNum * selected.apy) / 12)} USDC
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Est. yearly yield</span>
-                    <strong>{formatUsdc(amountNum * selected.apy)} USDC</strong>
-                  </div>
-                  <div>
-                    <span>Fees</span>
-                    <strong>
-                      {formatFee(selected.managementFee)} mgmt
-                      {selected.performanceFee > 0 && (
-                        <> · {formatFee(selected.performanceFee)} perf</>
-                      )}
-                    </strong>
-                  </div>
+                  {isWithdraw ? (
+                    <>
+                      <div>
+                        <span>You withdraw</span>
+                        <strong>{formatUsdc(amountNum)} USDC</strong>
+                      </div>
+                      <div>
+                        <span>Remaining position</span>
+                        <strong>
+                          {formatUsdc(Math.max(0, positionNum - amountNum))}{" "}
+                          USDC
+                        </strong>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span>You deposit</span>
+                        <strong>{formatUsdc(amountNum)} USDC</strong>
+                      </div>
+                      <div>
+                        <span>Est. monthly yield</span>
+                        <strong>
+                          {formatUsdc((amountNum * selected.apy) / 12)} USDC
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Est. yearly yield</span>
+                        <strong>
+                          {formatUsdc(amountNum * selected.apy)} USDC
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Fees</span>
+                        <strong>
+                          {formatFee(selected.managementFee)} mgmt
+                          {selected.performanceFee > 0 && (
+                            <> · {formatFee(selected.performanceFee)} perf</>
+                          )}
+                        </strong>
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {exceedsLiquidity && (
+                  <div className="dp-alert" role="status">
+                    <TriangleAlert size={15} />
+                    <span>
+                      This vault only has ${formatCompact(selected.liquidity)}{" "}
+                      of liquidity right now. A larger withdrawal may fail — try
+                      a smaller amount.
+                    </span>
+                  </div>
+                )}
 
                 {errorMessage && (
                   <div className="dp-alert" role="alert">
@@ -558,14 +720,16 @@ export default function EarnPage() {
                 <button
                   type="button"
                   className="dp-primary"
-                  onClick={() => void confirmDeposit()}
+                  onClick={() => void confirmAction()}
                   disabled={pending || !amountValid}
                 >
                   {pending
                     ? "Confirm in wallet…"
                     : amountValid
-                      ? `Deposit ${formatUsdc(amountNum)} USDC`
-                      : "Enter an amount"}
+                      ? `${isWithdraw ? "Withdraw" : "Deposit"} ${formatUsdc(amountNum)} USDC`
+                      : amountNum > 0 && isWithdraw && !withinPosition
+                        ? "Exceeds your position"
+                        : "Enter an amount"}
                 </button>
                 <button
                   type="button"
@@ -579,8 +743,11 @@ export default function EarnPage() {
                 <p className="dp-fine">
                   <ShieldCheck size={13} />
                   <span>
-                    Confirm the transaction in your wallet. Deposits go straight
-                    to the vault contract and arcex never takes custody.
+                    Confirm the transaction in your wallet.{" "}
+                    {isWithdraw
+                      ? "Funds return straight to your wallet from the vault contract."
+                      : "Deposits go straight to the vault contract"}{" "}
+                    and arcex never takes custody.
                   </span>
                 </p>
               </>
