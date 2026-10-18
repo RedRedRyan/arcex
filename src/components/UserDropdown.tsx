@@ -105,7 +105,7 @@ const UserDropdown = () => {
         aria-expanded={open}
         aria-controls="account-menu"
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="orange-btn flex items-center gap-2 px-3 py-1.5"
+        className="glass-btn flex items-center gap-2 px-3 py-1.5"
       >
         <img src="/assets/icons/wallet.png" alt="Wallet" className="size-6" />
         <span className="text-xs">{formatAddress(address)}</span>

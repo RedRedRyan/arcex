@@ -43,6 +43,9 @@
   .orange-btn {
     @apply h-10 cursor-pointer bg-[#ff7518] hover:bg-[#fb4f1f] text-white font-medium text-base rounded-3xl shadow-lg disabled:opacity-50;
   }
+  .glass-btn {
+    @apply h-10 cursor-pointer bg-gradient-to-br from-white/15 via-transparent to-transparent text-white font-medium text-base rounded-3xl shadow-lg disabled:opacity-50 border border-2 border-[#fb4f1f] hover:border-white;
+  }
   .deposit-btn {
     @apply h-6 w-16 cursor-pointer bg-white hover:bg-[#fb4f1f] text-black font-medium text-sm rounded-3xl shadow-lg disabled:opacity-50;
   }
