@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   DynamicProvider,
-  useExecuteSwapTransaction,
   useGetSwapQuote,
   useGetSwapStatus,
-  useGetWalletAccounts,
 } from "@dynamic-labs-sdk/react-hooks";
 import {
   ArrowDown,
@@ -16,8 +14,16 @@ import {
   Settings2,
   TriangleAlert,
 } from "lucide-react";
-import { formatUnits, parseUnits } from "viem";
-import { useAccount, useSwitchChain } from "wagmi";
+import {
+  formatUnits,
+  getAddress,
+  isHex,
+  parseAbi,
+  parseUnits,
+  publicActions,
+} from "viem";
+import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SWAP_TOKENS } from "../config/networks";
 import { dynamicClient } from "../dynamicClient";
@@ -213,6 +219,36 @@ const DEFAULT_FROM = "ethereum-usdc";
 const DEFAULT_TO = ARC_REF?.id ?? "ethereum-weth";
 const SLIPPAGE = 0.005;
 const STATUS_POLL_INTERVAL_MS = 3_000;
+const ERC20_ALLOWANCE_ABI = parseAbi([
+  "function allowance(address owner, address spender) view returns (uint256)",
+]);
+const ERC20_APPROVE_ABI = parseAbi([
+  "function approve(address spender, uint256 amount) returns (bool)",
+]);
+
+const isRateLimitError = (error: unknown): boolean => {
+  const seen = new Set<Error>();
+  let current = error;
+  while (current instanceof Error && !seen.has(current)) {
+    if (/429|rate.?limit|too many requests/i.test(current.message)) return true;
+    seen.add(current);
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return false;
+};
+
+async function readWithRateLimitRetry<T>(read: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      if (!isRateLimitError(error) || attempt >= 3) throw error;
+      await new Promise((resolve) =>
+        setTimeout(resolve, 500 * 2 ** attempt),
+      );
+    }
+  }
+}
 
 // ── CoinGecko icons (chains + coins) ─────────────────────────────────────────
 // Chain logos: /asset_platforms, matched by EVM chain id.
@@ -545,9 +581,9 @@ function TokenSelect({
 function SwapPageContent() {
   const { address: legacyAddress, chain, chainId } = useAccount();
   const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
-  // The wallet the user already connected through Dynamic.
-  const { data: walletAccounts = [], error: walletAccountsError } =
-    useGetWalletAccounts();
+  const { data: walletClient, isLoading: walletClientLoading } =
+    useWalletClient();
+  const publicClient = usePublicClient();
   const icons = useSwapIcons();
 
   const [fromId, setFromId] = useState(DEFAULT_FROM);
@@ -562,21 +598,7 @@ function SwapPageContent() {
   const toToken =
     TOKENS.find((token) => token.id === toId) ?? TOKENS[1] ?? TOKENS[0];
 
-  // Connection state is driven by the wagmi account (the session Dynamic
-  // already synced into wagmi), NOT by useGetWalletAccounts() alone. That
-  // hook can be empty on first render or when the list lags the session, which
-  // previously made a connected wallet read as "Wallet not connected".
-  const walletAccount =
-    walletAccounts.find(
-      (account) =>
-        legacyAddress &&
-        account.address.toLowerCase() === legacyAddress.toLowerCase(),
-    ) ??
-    walletAccounts[0] ??
-    // Fall back to the wagmi account so the swap UI works even when Dynamic's
-    // account list hasn't populated yet.
-    (legacyAddress ? { address: legacyAddress } : undefined);
-  const address = walletAccount?.address;
+  const address = legacyAddress ?? walletClient?.account.address;
   const isConnected = !!address;
 
   const amountInSmallestUnit = useMemo(() => {
@@ -627,19 +649,119 @@ function SwapPageContent() {
     mutate: executeSwap,
     isPending: swapPending,
     error: swapError,
-  } = useExecuteSwapTransaction({
-    mutateParams: {
-      onSuccess: ({ transactionHash: hash }) => {
-        setTransactionHash(hash);
-        setExecutionStep(null);
-        toast.success("Swap submitted", {
-          description: "Tracking the swap until it settles.",
-        });
-      },
-      onError: (error) => {
-        setExecutionStep(null);
-        toast.error("Swap failed", { description: error.message });
-      },
+  } = useMutation({
+    mutationFn: async ({
+      signingPayload,
+    }: {
+      signingPayload: SigningPayload;
+    }) => {
+      if (!walletClient || !publicClient) {
+        throw new Error("Your connected wallet is not ready to sign transactions.");
+      }
+
+      const signingChainId = Number(signingPayload.chainId);
+      if (
+        !Number.isSafeInteger(signingChainId) ||
+        signingChainId !== fromToken.chainId ||
+        walletClient.chain.id !== signingChainId ||
+        chainId !== signingChainId
+      ) {
+        throw new Error(
+          `The quote is for chain ${signingPayload.chainId}, but your wallet is not connected to ${fromToken.networkName}. Refresh the quote and try again.`,
+        );
+      }
+
+      const { evmApproval, evmTransaction } = signingPayload;
+      if (!evmTransaction) {
+        throw new Error("The swap quote does not contain an EVM transaction.");
+      }
+      if (!isHex(evmTransaction.data)) {
+        throw new Error("The swap quote contains invalid transaction data.");
+      }
+
+      if (evmApproval) {
+        const tokenAddress = getAddress(evmApproval.tokenAddress);
+        const spenderAddress = getAddress(evmApproval.spenderAddress);
+        const allowanceArgs = {
+          address: tokenAddress,
+          abi: ERC20_ALLOWANCE_ABI,
+          functionName: "allowance" as const,
+          args: [walletClient.account.address, spenderAddress] as const,
+        };
+        let allowance: bigint;
+        try {
+          allowance = await readWithRateLimitRetry(() =>
+            publicClient.readContract(allowanceArgs),
+          );
+        } catch (error) {
+          if (!isRateLimitError(error)) throw error;
+          const walletReader = walletClient.extend(publicActions);
+          allowance = await readWithRateLimitRetry(() =>
+            walletReader.readContract(allowanceArgs),
+          );
+        }
+
+        if (allowance < BigInt(evmApproval.amount)) {
+          setExecutionStep("approval");
+          const approvalHash = await walletClient.writeContract({
+            address: tokenAddress,
+            abi: ERC20_APPROVE_ABI,
+            functionName: "approve",
+            args: [spenderAddress, BigInt(evmApproval.amount)],
+          });
+          const receipt = await walletClient
+            .extend(publicActions)
+            .waitForTransactionReceipt({
+              hash: approvalHash,
+            });
+          if (receipt.status !== "success") {
+            throw new Error("Token approval failed on-chain.");
+          }
+        }
+      }
+
+      setExecutionStep("transaction");
+      const gasParams =
+        evmTransaction.maxFeePerGas && evmTransaction.maxPriorityFeePerGas
+          ? {
+              maxFeePerGas: BigInt(evmTransaction.maxFeePerGas),
+              maxPriorityFeePerGas: BigInt(
+                evmTransaction.maxPriorityFeePerGas,
+              ),
+            }
+          : evmTransaction.gasPrice
+            ? { gasPrice: BigInt(evmTransaction.gasPrice) }
+            : {};
+      const nonce =
+        evmTransaction.nonce === undefined
+          ? undefined
+          : Number(evmTransaction.nonce);
+      if (nonce !== undefined && !Number.isSafeInteger(nonce)) {
+        throw new Error("The swap quote contains an invalid transaction nonce.");
+      }
+
+      const hash = await walletClient.sendTransaction({
+        to: getAddress(evmTransaction.to),
+        data: evmTransaction.data,
+        value: evmTransaction.value ? BigInt(evmTransaction.value) : 0n,
+        ...(evmTransaction.gasLimit
+          ? { gas: BigInt(evmTransaction.gasLimit) }
+          : {}),
+        ...gasParams,
+        ...(nonce !== undefined ? { nonce } : {}),
+      });
+      return { transactionHash: hash };
+    },
+    onSuccess: ({ transactionHash: hash }) => {
+      setTransactionHash(hash);
+      setExecutionStep(null);
+      toast.success("Swap submitted", {
+        description: "Tracking the swap until it settles.",
+      });
+    },
+    onError: (error) => {
+      setExecutionStep(null);
+      toast.error("Swap failed", { description: error.message });
     },
   });
 
@@ -666,6 +788,9 @@ function SwapPageContent() {
     : "—";
   const quoteReady =
     canRequestQuote && !!quote?.signingPayload && !quoteLoading && !quoteError;
+  type SigningPayload = NonNullable<
+    NonNullable<typeof quote>["signingPayload"]
+  >;
   const statusLabel =
     swapStatus?.status === "DONE"
       ? "Swap complete"
@@ -682,13 +807,9 @@ function SwapPageContent() {
   };
 
   const handleExecute = () => {
-    if (!walletAccount || !quote?.signingPayload) return;
+    if (!walletClient || !quote?.signingPayload) return;
     setExecutionStep(null);
-    executeSwap({
-      walletAccount,
-      signingPayload: quote.signingPayload,
-      onStepChange: setExecutionStep,
-    });
+    executeSwap({ signingPayload: quote.signingPayload });
   };
 
   return (
@@ -885,9 +1006,11 @@ function SwapPageContent() {
             </div>
           )}
 
-          {walletAccountsError && (
-            <p role="alert" className="mb-3 text-center text-xs text-red-300">
-              {walletAccountsError.message}
+          {isConnected && !walletClient && (
+            <p role="status" className="mb-3 text-center text-xs text-amber-300">
+              {walletClientLoading
+                ? "Preparing wallet for the swap…"
+                : "Your wallet is connected, but its signer is unavailable. Reconnect your wallet and try again."}
             </p>
           )}
 
@@ -895,7 +1018,12 @@ function SwapPageContent() {
             <button
               type="button"
               onClick={handleExecute}
-              disabled={!quoteReady || swapPending || isSwitchingChain}
+              disabled={
+                !walletClient ||
+                !quoteReady ||
+                swapPending ||
+                isSwitchingChain
+              }
               className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-bold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
@@ -918,6 +1046,10 @@ function SwapPageContent() {
                         ? "Refreshing quote…"
                         : quoteLoading
                           ? "Getting quote…"
+                          : !walletClient
+                            ? walletClientLoading
+                              ? "Preparing wallet…"
+                              : "Wallet unavailable"
                           : !amountInSmallestUnit
                             ? "Enter an amount"
                             : quoteReady
